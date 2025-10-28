@@ -27,7 +27,7 @@ services:
   postgres:
     container_name: postgres-reborn
     build:
-      context: ./db
+      context: ./postgres
     ports:
       - "5432:5432"
     env_file:
@@ -40,9 +40,11 @@ services:
   mosquitto:
     container_name: mosquitto-reborn
     build:
-      context: ./mqtt
+      context: ./mosquitto
     ports:
       - "8883:8883"
+    volumes:
+      - /etc/letsencrypt/live/k13c101.p.ssafy.io:/etc/letsencrypt/live/k13c101.p.ssafy.io
     networks:
       - network-reborn
 
