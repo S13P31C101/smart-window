@@ -1,21 +1,11 @@
 services:
-  nginx:
-    container_name: nginx-reborn
-    build:
-      context: ./nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - spring-reborn
-    networks:
-      - network-reborn
-
   spring-reborn:
     image: spring-reborn:latest
     container_name: spring-reborn
+    ports:
+      - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_PROFILES_ACTIVE=dev
     env_file:
       - .env
     depends_on:
