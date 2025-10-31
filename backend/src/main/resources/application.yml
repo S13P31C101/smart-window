@@ -21,6 +21,26 @@ spring:
 server:
   port: 8080 # 우리 서버가 실행될 포트
 
+# S3 설정
+cloud:
+  aws:
+    region:
+      static: ${S3_REGION}
+    s3:
+      bucket: ${S3_BUCKET}
+    credentials:
+      access-key: ${S3_ACCESS}
+      secret-key: ${S3_SECRET}
+
+# MQTT 설정
+mqtt:
+  server:
+    uri: tcp://${MQTT_HOST}:${MQTT_PORT}
+  client:
+    id: ${MQTT_CLIENT_ID}
+  username: ${MQTT_USER}
+  password: ${MQTT_PASSWORD}
+
 # JWT (JSON Web Token) 설정
 jwt:
   secret: ${JWT_SECRET} # TODO: 외부 환경변수에서 가져올 JWT 비밀키
@@ -114,9 +134,9 @@ spring:
 
   # Database & JPA
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate # 운영 시에는 validate 또는 none으로 설정하여 DB를 함부로 변경하지 않도록 함
