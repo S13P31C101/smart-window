@@ -42,14 +42,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 이 주소들은 모두 허용
                         .anyRequest().authenticated() // 나머지 모든 요청은 인증 필요
-                )
+                );
 
                 // 5. OAuth2 로그인 설정
-                .oauth2Login(oauth2 -> oauth2
-                        // TODO: 로그인 성공/실패 핸들러, 사용자 정보 서비스 연결
-                        // .userInfoEndpoint(user -> user.userService(customOAuth2UserService))
-                        // .successHandler(oAuth2SuccessHandler)
-                );
+//                .oauth2Login(oauth2 -> oauth2
+//                        // TODO: 로그인 성공/실패 핸들러, 사용자 정보 서비스 연결
+//                        // .userInfoEndpoint(user -> user.userService(customOAuth2UserService))
+//                        // .successHandler(oAuth2SuccessHandler)
+//                );
                 
                 // 6. JWT 필터 추가
                 // TODO: 우리가 만든 JWT 필터를 Spring Security 필터 체인에 추가

@@ -22,7 +22,7 @@ import org.springframework.messaging.handler.annotation.Header;
 
 @Configuration
 @EnableIntegration
-@IntegrationComponentScan(basePackageClasses = MqttPublishService.class)
+@IntegrationComponentScan
 public class MqttConfig {
 
     @Value("${mqtt.server.uri}")
