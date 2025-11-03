@@ -8,8 +8,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -31,8 +33,9 @@ public class Alarm {
     @Column(name = "alarm_time", nullable = false)
     private LocalTime alarmTime;
 
+    @Convert(converter = DayOfWeekConverter.class)
     @Column(name = "repeat_days", length = 100)
-    private String repeatDays;
+    private Set<DayOfWeek> repeatDays;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
@@ -43,7 +46,7 @@ public class Alarm {
 
 
     @Builder
-    public Alarm(Device device, String alarmName, LocalTime alarmTime, String repeatDays, boolean isActive) {
+    public Alarm(Device device, String alarmName, LocalTime alarmTime, Set<DayOfWeek> repeatDays, boolean isActive) {
         this.device = device;
         this.alarmName = alarmName;
         this.alarmTime = alarmTime;
@@ -52,7 +55,7 @@ public class Alarm {
     }
 
 
-    public void update(String alarmName, LocalTime alarmTime, String repeatDays, boolean isActive) {
+    public void update(String alarmName, LocalTime alarmTime, Set<DayOfWeek> repeatDays, boolean isActive) {
         this.alarmName = alarmName;
         this.alarmTime = alarmTime;
         this.repeatDays = repeatDays;

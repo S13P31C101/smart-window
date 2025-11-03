@@ -18,6 +18,7 @@ public class DeviceController {
     private final DeviceService deviceService;
 
     // TODO
+    // DELETE
     private Long getMockUserId() {
         return 1L;
     }
