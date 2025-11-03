@@ -1,6 +1,6 @@
 package com.lumiscape.smartwindow.device.dto;
 
-public record DeviceRegisterRequestDto(
+public record DeviceRegisterRequest(
         String deviceUniqueId,
         String deviceName
 ) {

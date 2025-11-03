@@ -1,9 +1,7 @@
 package com.lumiscape.smartwindow.device.controller;
 
-import com.lumiscape.smartwindow.device.dto.DeviceControlRequestDto;
-import com.lumiscape.smartwindow.device.dto.DeviceDetailResponseDto;
-import com.lumiscape.smartwindow.device.dto.DeviceRegisterRequestDto;
-import com.lumiscape.smartwindow.device.dto.DeviceUpdateRequestDto;
+import com.lumiscape.smartwindow.device.domain.Device;
+import com.lumiscape.smartwindow.device.dto.*;
 import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,36 +23,39 @@ public class DeviceController {
     }
 
     @GetMapping
-    public ApiResponse<List<DeviceDetailResponseDto>> getMyDevices() {
+    public ApiResponse<List<DeviceDetailResponse>> getMyDevices() {
+    // public ApiResponse<List<DeviceDetailResponse>> getMyDevices(@AuthenticationPrincipal Long userId) {
         Long userId = getMockUserId();
-        List<DeviceDetailResponseDto> devices = deviceService.getMyDevice(userId);
+        List<DeviceDetailResponse> devices = deviceService.getMyDevice(userId);
 
         return ApiResponse.onSuccess(devices);
     }
 
     @PostMapping
-    public ApiResponse<DeviceDetailResponseDto> registerDevice(@RequestBody DeviceRegisterRequestDto request) {
+    public ApiResponse<DeviceDetailResponse> registerDevice(@RequestBody DeviceRegisterRequest request) {
+    // public ApiResponse<DeviceDetailResponse> registerDevice(@AuthenticationPrincipal Long userId, @RequestBody DeviceRegisterRequest request) {
         Long userId = getMockUserId();
-        DeviceDetailResponseDto newDevice = deviceService.registerDevice(userId, request);
+        DeviceDetailResponse newDevice = deviceService.registerDevice(userId, request);
 
         return ApiResponse.onSuccess(HttpStatus.CREATED, newDevice);
     }
 
     @GetMapping("/{device-id}")
-    public ApiResponse<DeviceDetailResponseDto> getDeviceDetail(@PathVariable("device-id") Long deviceId) {
+    public ApiResponse<DeviceDetailResponse> getDeviceDetail(@PathVariable("device-id") Long deviceId) {
+    // public ApiResponse<DeviceDetailResponse> getDeviceDetail(@AuthenticationPrincipal @PathVariable("device-id") Long deviceId) {
         Long userId = getMockUserId();
-        DeviceDetailResponseDto device = deviceService.getDeviceDetail(userId, deviceId);
+        DeviceDetailResponse device = deviceService.getDeviceDetail(userId, deviceId);
 
         return ApiResponse.onSuccess(device);
     }
 
     @PatchMapping("/{device-id}")
-    public ApiResponse<DeviceDetailResponseDto> updateDeviceName(@PathVariable("device-id") Long deviceId,
-                                                                 @RequestBody DeviceUpdateRequestDto request) {
+    public ApiResponse<DeviceDetailResponse> updateDeviceName(@PathVariable("device-id") Long deviceId,
+                                                              @RequestBody DeviceUpdateNameRequest request) {
         Long userId = getMockUserId();
-        DeviceDetailResponseDto updatedDevice = deviceService.updateDeviceName(userId, deviceId, request);
+        DeviceDetailResponse response = deviceService.updateDeviceName(userId, deviceId, request);
 
-        return ApiResponse.onSuccess(updatedDevice);
+        return ApiResponse.onSuccess(response);
     }
 
     @DeleteMapping("/{device-id}")
@@ -65,30 +66,55 @@ public class DeviceController {
         return ApiResponse.onSuccess();
     }
 
-    @PutMapping("/{device-id}/power")
-    public ApiResponse<DeviceDetailResponseDto> controlPower(@PathVariable("device-id") Long deviceId,
-                                                             @RequestBody DeviceControlRequestDto request) {
+    @GetMapping("/{device-id}/power")
+    public ApiResponse<DeviceStatusResponse> getPowerStatus(@PathVariable("device-id") Long deviceId) {
         Long userId = getMockUserId();
-        DeviceDetailResponseDto updatedDevice = deviceService.controlPower(userId, deviceId, request);
+        DeviceStatusResponse response = deviceService.getPowerStatus(userId, deviceId);
 
-        return ApiResponse.onSuccess(updatedDevice);
+        return ApiResponse.onSuccess(response);
+    }
+
+    @PutMapping("/{device-id}/power")
+    public ApiResponse<DeviceStatusResponse> controlPower(@PathVariable("device-id") Long deviceId,
+                                                          @RequestBody DeviceStatusRequest request) {
+        Long userId = getMockUserId();
+        DeviceStatusResponse response = deviceService.controlPower(userId, deviceId, request);
+
+        return ApiResponse.onSuccess(response);
+    }
+
+    @GetMapping("/{device-id}/open")
+    public ApiResponse<DeviceStatusResponse> getOpenStatus(@PathVariable("device-id") Long deviceId) {
+        Long userId = getMockUserId();
+        DeviceStatusResponse response = deviceService.getOpenStatus(userId, deviceId);
+
+        return ApiResponse.onSuccess(response);
     }
 
     @PutMapping("/{device-id}/open")
-    public ApiResponse<DeviceDetailResponseDto> controlOpen(@PathVariable("device-id") Long deviceId,
-                                                             @RequestBody DeviceControlRequestDto request) {
+    public ApiResponse<DeviceStatusResponse> controlOpen(@PathVariable("device-id") Long deviceId,
+                                                         @RequestBody DeviceStatusRequest request) {
         Long userId = getMockUserId();
-        DeviceDetailResponseDto updatedDevice = deviceService.controlOpen(userId, deviceId, request);
+        DeviceStatusResponse response = deviceService.controlOpen(userId, deviceId, request);
 
-        return ApiResponse.onSuccess(updatedDevice);
+        return ApiResponse.onSuccess(response);
     }
 
-    @PatchMapping("/{device-id}/mode")
-    public ApiResponse<DeviceDetailResponseDto> controlMode(@PathVariable("device-id") Long deviceId,
-                                                            @RequestBody DeviceControlRequestDto request) {
+    @PutMapping("/{device-id}/mode/status")
+    public ApiResponse<DeviceModeStatusResponse> controlModeStatus(@PathVariable("device-id") Long deviceId,
+                                                                   @RequestBody DeviceModeStatusRequest request) {
         Long userId = getMockUserId();
-        DeviceDetailResponseDto updatedDevice = deviceService.controlMode(userId, deviceId, request);
+        DeviceModeStatusResponse response = deviceService.controlModeStatus(userId, deviceId, request);
 
-        return ApiResponse.onSuccess(updatedDevice);
+        return ApiResponse.onSuccess(response);
+    }
+
+    @PutMapping("/{device-id}/mode/settings")
+    public ApiResponse<DeviceModeSettingsResponse> controlModeSettings(@PathVariable("device-id") Long deviceId,
+                                                                       @RequestBody DeviceModeSettingsRequest request) {
+        Long userId = getMockUserId();
+        DeviceModeSettingsResponse response = deviceService.controlModeSettings(userId, deviceId, request);
+
+        return ApiResponse.onSuccess(response);
     }
 }

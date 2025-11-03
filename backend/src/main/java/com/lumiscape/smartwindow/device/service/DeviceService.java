@@ -4,10 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
-import com.lumiscape.smartwindow.device.dto.DeviceControlRequestDto;
-import com.lumiscape.smartwindow.device.dto.DeviceDetailResponseDto;
-import com.lumiscape.smartwindow.device.dto.DeviceRegisterRequestDto;
-import com.lumiscape.smartwindow.device.dto.DeviceUpdateRequestDto;
+import com.lumiscape.smartwindow.device.dto.*;
 import com.lumiscape.smartwindow.device.repository.DeviceRepository;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
@@ -34,45 +31,44 @@ public class DeviceService {
     private final MqttPublishService mqttPublishService;
     private final ObjectMapper objectMapper;
 
-    public List<DeviceDetailResponseDto> getMyDevice(Long userId) {
-        User user = findUserById(userId);
+    public List<DeviceDetailResponse> getMyDevice(Long userId) {
 
-        return deviceRepository.findAllByUser(user).stream()
-                .map(DeviceDetailResponseDto::from)
+        return deviceRepository.findAllByUserId(userId).stream()
+                .map(DeviceDetailResponse::from)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public DeviceDetailResponseDto registerDevice(Long userId, DeviceRegisterRequestDto request) {
+    public DeviceDetailResponse registerDevice(Long userId, DeviceRegisterRequest request) {
         if (deviceRepository.existsByDeviceUniqueId(request.deviceUniqueId())) {
             throw new CustomException(ErrorCode.DEVICE_ALREADY_EXISTS);
         }
 
-        User user = findUserById(userId);
+        User userReference = userRepository.getReferenceById(userId);
 
         Device newDevice = Device.builder()
-                .user(user)
+                .user(userReference)
                 .deviceUniqueId(request.deviceUniqueId())
                 .deviceName(request.deviceName())
                 .build();
 
         Device savedDevice = deviceRepository.save(newDevice);
 
-        return DeviceDetailResponseDto.from(savedDevice);
+        return DeviceDetailResponse.from(savedDevice);
     }
 
-    public DeviceDetailResponseDto getDeviceDetail(Long userId, Long deviceId) {
+    public DeviceDetailResponse getDeviceDetail(Long userId, Long deviceId) {
         Device device = findDeviceByUser(deviceId, userId);
 
-        return DeviceDetailResponseDto.from(device);
+        return DeviceDetailResponse.from(device);
     }
 
     @Transactional
-    public DeviceDetailResponseDto updateDeviceName(Long userId, Long deviceId, DeviceUpdateRequestDto request) {
+    public DeviceDetailResponse updateDeviceName(Long userId, Long deviceId, DeviceUpdateNameRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
         device.updateName(request.deviceName());
 
-        return DeviceDetailResponseDto.from(device);
+        return DeviceDetailResponse.from(device);
     }
 
     @Transactional
@@ -82,8 +78,14 @@ public class DeviceService {
         deviceRepository.delete(device);
     }
 
+    public DeviceStatusResponse getPowerStatus(Long userId, Long deviceId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        return DeviceStatusResponse.ofPower(device);
+    }
+
     @Transactional
-    public DeviceDetailResponseDto controlPower(Long userId, Long deviceId, DeviceControlRequestDto request) {
+    public DeviceStatusResponse controlPower(Long userId, Long deviceId, DeviceStatusRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
@@ -91,11 +93,17 @@ public class DeviceService {
 
         device.updatePower(newStatus);
 
-        return DeviceDetailResponseDto.from(device);
+        return DeviceStatusResponse.ofPower(device);
+    }
+
+    public DeviceStatusResponse getOpenStatus(Long userId, Long deviceId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        return DeviceStatusResponse.ofOpen(device);
     }
 
     @Transactional
-    public DeviceDetailResponseDto controlOpen(Long userId, Long deviceId, DeviceControlRequestDto request) {
+    public DeviceStatusResponse controlOpen(Long userId, Long deviceId, DeviceStatusRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
@@ -103,36 +111,49 @@ public class DeviceService {
 
         device.updateOpen(newStatus);
 
-        return DeviceDetailResponseDto.from(device);
+        return DeviceStatusResponse.ofOpen(device);
     }
 
     @Transactional
-    public DeviceDetailResponseDto controlMode(Long userId, Long deviceId, DeviceControlRequestDto request) {
+    public DeviceModeStatusResponse controlModeStatus(Long userId, Long deviceId, DeviceModeStatusRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
 
         DeviceMode newMode = DeviceMode.valueOf(request.mode().toUpperCase());
-        Map<String, Object> newSettings = request.modeSettings();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "mode", Map.of("mode", newMode));
+        publishMqttCommand(device.getDeviceUniqueId(), "mode", Map.of("mode", newMode.name()));
 
         device.updateMode(newMode);
+
+        return DeviceModeStatusResponse.from(device);
+    }
+
+    @Transactional
+    public DeviceModeSettingsResponse controlModeSettings(Long userId, Long deviceId, DeviceModeSettingsRequest request) {
+        Device device = findDeviceByUser(deviceId, userId);
+        Map<String, Object> newSettings = request.settings();
+
         device.updateModeSettings(newSettings);
 
-        return DeviceDetailResponseDto.from(device);
+        return DeviceModeSettingsResponse.from(device);
     }
 
     @Transactional
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
+        Device device = deviceRepository.findByDeviceUniqueId(deviceUniqueId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
         // TODO
-    }
-
-    // TODO
-    private User findUserById(Long userId) {
-        return null;
-//        return userRepository.findById(userId)
-//                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        switch (statusType) {
+            case "power":
+                boolean power = Boolean.parseBoolean(payload);
+                device.updatePower(power);
+                break;
+            case "open":
+                boolean open = Boolean.parseBoolean(payload);
+                device.updateOpen(open);
+                break;
+        }
     }
 
     private Device findDeviceByUser(Long deviceId, Long userId) {

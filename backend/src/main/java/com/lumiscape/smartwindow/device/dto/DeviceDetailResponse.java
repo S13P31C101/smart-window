@@ -6,7 +6,7 @@ import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import java.time.OffsetDateTime;
 import java.util.Map;
 
-public record DeviceDetailResponseDto(
+public record DeviceDetailResponse(
         Long deviceId,
         String deviceUniqueId,
         String deviceName,
@@ -18,8 +18,8 @@ public record DeviceDetailResponseDto(
         OffsetDateTime createdAt
 ) {
 
-    public static DeviceDetailResponseDto from(Device device) {
-        return new DeviceDetailResponseDto(
+    public static DeviceDetailResponse from(Device device) {
+        return new DeviceDetailResponse(
                 device.getId(),
                 device.getDeviceName(),
                 device.getDeviceUniqueId(),

@@ -20,7 +20,7 @@ import java.util.Map;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table
+@Table(name = "devices")
 public class Device {
 
     @Id
