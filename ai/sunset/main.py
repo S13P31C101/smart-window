@@ -11,7 +11,7 @@ from transformers import SegformerForSemanticSegmentation, SegformerImageProcess
 from diffusers import StableDiffusionInpaintPipeline
 
 app = FastAPI()
-SAVE_DIR = "results"
+SAVE_DIR = "../results"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # SegFormer 고품질 모델 (b3)
@@ -60,7 +60,7 @@ async def sunset_blend(
     original_file: UploadFile = File(...),
     sunset_file: UploadFile = File(...),
     alpha: float = 0.7,
-    prompt: str = "sunset view, natural sky transition, realistic lighting"
+    prompt: str = "dawn view, early morning soft light, misty atmosphere, calm and serene"
 ):
     try:
         orig_bytes = await original_file.read()
@@ -98,13 +98,13 @@ async def sunset_blend(
             image=blended_pil,
             mask_image=mask_img,
             guidance_scale=10.0,      # 비교적 높게 설정
-            num_inference_steps=100,
+            num_inference_steps=50,
             # 만약 pipeline이 strength를 지원한다면 다음처럼 사용
-            # strength=0.8           # 1에 가까울수록 강한 변경, 낮출수록 원본 유지
+            #strength=0.8           # 1에 가까울수록 강한 변경, 낮출수록 원본 유지
         ).images[0]
 
 
-        save_path = os.path.join(SAVE_DIR, f"test_sunset_blend_refined.png")
+        save_path = os.path.join(SAVE_DIR, "test_sunset_blend_refined.png")
         inpaint_result.save(save_path)
 
         return {"success": True, "result_path": save_path}
