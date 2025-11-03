@@ -10,6 +10,7 @@ diffusers>=0.27.1
 ultralytics>=8.0
 python-multipart
 accelerate
+spotify
 
 # py -3.10 -m venv testv
 # .\testv\Scripts\activate
