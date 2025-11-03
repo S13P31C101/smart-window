@@ -1,13 +1,16 @@
 package com.frontend
 
+import android.os.Bundle;
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
-import android.os.Bundle;
 
 class MainActivity : ReactActivity() {
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(null)
+    }
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule
    * rendering of the component.
@@ -20,12 +23,4 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
-
-  /**
-   * react-native-screens와 reanimated를 위한 추가 설정입니다.
-   * 이 fun onCreate(savedInstanceState: Bundle?) 메소드를 꼭 추가해주세요.
-   */
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(null)
-  }
 }
