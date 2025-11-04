@@ -1,68 +1,69 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import JSONResponse
-from ultralytics import YOLO
-import cv2
-import numpy as np
+from transformers import BlipProcessor, BlipForConditionalGeneration
+import torch
 from PIL import Image
 import io
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import httpx
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # .env 파일 내용 로드
 
 app = FastAPI()
 
-# Spotify API 설정 (사전에 앱 등록 및 클라이언트 ID/시크릿, 리다이렉트 URI 설정 필요)
-SPOTIPY_CLIENT_ID = "your_spotify_client_id"
-SPOTIPY_CLIENT_SECRET = "your_spotify_client_secret"
-SPOTIPY_REDIRECT_URI = "http://localhost:8080/callback"
-SCOPE = "user-read-playback-state user-modify-playback-state"
+# BLIP 캡셔닝 모델 로드 (분위기 문장 생성용)
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
 
-sp_oauth = SpotifyOAuth(client_id=SPOTIPY_CLIENT_ID,
-                        client_secret=SPOTIPY_CLIENT_SECRET,
-                        redirect_uri=SPOTIPY_REDIRECT_URI,
-                        scope=SCOPE)
+# YouTube Data API 키 (Google Cloud Platform에서 발급 필요)
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")  # 환경변수로부터 읽기
+YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 
-# YOLO object detection 모델 로드 (ultralytics YOLOv8 사전학습 모델 사용)
-model = YOLO("yolov8n.pt")
+def extract_mood_caption(image_bytes: bytes) -> str:
+    image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+    inputs = processor(image, return_tensors="pt")
+    output = model.generate(**inputs)
+    caption = processor.decode(output[0], skip_special_tokens=True)
+    return caption
+
+async def search_youtube_music(query: str):
+    params = {
+        "part": "snippet",
+        "q": query,
+        "type": "video",
+        "videoCategoryId": "10",  # 음악 카테고리
+        "maxResults": 1,
+        "key": YOUTUBE_API_KEY
+    }
+    async with httpx.AsyncClient() as client:
+        r = await client.get(YOUTUBE_SEARCH_URL, params=params)
+        data = r.json()
+    if "items" in data and len(data["items"]) > 0:
+        video_id = data["items"][0]["id"]["videoId"]
+        video_title = data["items"][0]["snippet"]["title"]
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        return {"title": video_title, "url": video_url}
+    else:
+        return None
 
 @app.post("/upload-image/")
 async def upload_image(file: UploadFile = File(...)):
     contents = await file.read()
-    np_arr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    caption = extract_mood_caption(contents)
+    # 간단하게 캡션을 키워드처럼 반환, 필요시 NLP 처리 추가 가능
+    return {"mood_caption": caption}
 
-    # 이미지에서 객체 탐지 실행
-    results = model(img)
-    keywords = set()
-    for result in results:
-        for box in result.boxes:
-            # 클래스 이름을 키워드로 추가
-            keywords.add(model.names[int(box.cls)])
-    
-    keywords = list(keywords)
-    return {"keywords": keywords}
-
-@app.post("/play-song/")
-async def play_song(keywords: str = Form(...)):
-    # 전달된 키워드는 쉼표로 구분된 문자열로 받음
-    keyword_list = keywords.split(",")
-    query = " ".join(keyword_list)
-
-    # Spotify 재생 토큰 받아오기
-    token_info = sp_oauth.get_cached_token()
-    if not token_info:
-        auth_url = sp_oauth.get_authorize_url()
-        return {"auth_url": auth_url, "message": "Authorize using this URL and get the token first."}
-
-    sp = spotipy.Spotify(auth=token_info['access_token'])
-
-    # 키워드로 노래 검색
-    results = sp.search(q=query, limit=1, type='track')
-    if results['tracks']['items']:
-        track = results['tracks']['items'][0]
-        track_uri = track['uri']
-
-        # 현재 플레이어가 있으면 재생 요청
-        sp.start_playback(uris=[track_uri])
-        return {"message": f"Playing song: {track['name']} by {track['artists'][0]['name']}"}
+@app.post("/recommend-music/")
+async def recommend_music(mood_caption: str = Form(...)):
+    """
+    캡션(분위기 문장)을 받고 YouTube Data API로 음악 영상 검색 후 재생 URL 반환
+    """
+    result = await search_youtube_music(mood_caption)
+    if result:
+        return {"message": f"Found song '{result['title']}'", "youtube_url": result["url"]}
     else:
-        return {"message": "No matching songs found."}
+        return {"message": "No matching music found."}
+
+# 클라이언트는 /upload-image/로 풍경 이미지 전송 → /recommend-music/ 에서 그 캡션으로 검색해서
+# 받은 youtube_url을 유튜브 iframe API로 재생시키면 됨.
