@@ -36,13 +36,13 @@ public class SecurityConfig {
                 .sessionManagement(configurer -> configurer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 
                 // 3. CORS 설정 추가
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
                 // 4. 요청 경로별 접근 권한 설정
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 이 주소들은 모두 허용
-                        .anyRequest().authenticated() // 나머지 모든 요청은 인증 필요
-                );
+//                .authorizeHttpRequests(authorize -> authorize
+//                        .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 이 주소들은 모두 허용
+//                        .anyRequest().authenticated() // 나머지 모든 요청은 인증 필요
+//                );
 
                 // 5. OAuth2 로그인 설정
 //                .oauth2Login(oauth2 -> oauth2

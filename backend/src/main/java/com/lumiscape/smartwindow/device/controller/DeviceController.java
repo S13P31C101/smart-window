@@ -27,9 +27,9 @@ public class DeviceController {
     public ApiResponse<List<DeviceDetailResponse>> getMyDevices() {
     // public ApiResponse<List<DeviceDetailResponse>> getMyDevices(@AuthenticationPrincipal Long userId) {
         Long userId = getMockUserId();
-        List<DeviceDetailResponse> devices = deviceService.getMyDevice(userId);
+        List<DeviceDetailResponse> responses = deviceService.getMyDevice(userId);
 
-        return ApiResponse.onSuccess(devices);
+        return ApiResponse.onSuccess(responses);
     }
 
     @PostMapping
@@ -45,9 +45,9 @@ public class DeviceController {
     public ApiResponse<DeviceDetailResponse> getDeviceDetail(@PathVariable("device-id") Long deviceId) {
     // public ApiResponse<DeviceDetailResponse> getDeviceDetail(@AuthenticationPrincipal @PathVariable("device-id") Long deviceId) {
         Long userId = getMockUserId();
-        DeviceDetailResponse device = deviceService.getDeviceDetail(userId, deviceId);
+        DeviceDetailResponse response = deviceService.getDeviceDetail(userId, deviceId);
 
-        return ApiResponse.onSuccess(device);
+        return ApiResponse.onSuccess(response);
     }
 
     @PatchMapping("/{device-id}")
