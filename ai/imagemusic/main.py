@@ -59,7 +59,7 @@ async def recommend_music(mood_caption: str = Form(...)):
     """
     캡션(분위기 문장)을 받고 YouTube Data API로 음악 영상 검색 후 재생 URL 반환
     """
-    result = await search_youtube_music(mood_caption)
+    result = await search_youtube_music(mood_caption +" piano music")
     if result:
         return {"message": f"Found song '{result['title']}'", "youtube_url": result["url"]}
     else:
