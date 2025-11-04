@@ -38,14 +38,14 @@ public class Device {
     private String deviceName;
 
     @Column(name = "power_status", nullable = false)
-    private boolean powerStatus;
+    private boolean powerStatus = false;
 
     @Column(name = "open_status", nullable = false)
-    private boolean openStatus;
+    private boolean openStatus = false;
 
-    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "mode_status", nullable = false, columnDefinition = "device_mode_enum")
-    private DeviceMode modeStatus;
+    private DeviceMode modeStatus = DeviceMode.AUTO_MODE;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "mode_settings", columnDefinition = "jsonb")
