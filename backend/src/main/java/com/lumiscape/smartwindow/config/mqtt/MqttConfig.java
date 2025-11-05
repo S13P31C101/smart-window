@@ -16,6 +16,7 @@ import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannel
 import org.springframework.integration.mqtt.outbound.MqttPahoMessageHandler;
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.integration.mqtt.support.MqttHeaders;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.handler.annotation.Header;
@@ -38,7 +39,8 @@ public class MqttConfig {
     private String password;
 
     public static final String MQTT_OUTBOUND_CHANNEL = "mqttOutboundChannel";
-    public static final String MQTT_INPUT_CHANNEL = "mqttInputChannel";
+    public static final String MQTT_STATUS_INPUT_CHANNEL = "mqttStatusInputChannel";
+    public static final String MQTT_REQUEST_INPUT_CHANNEL = "mqttRequestInputChannel";
 
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
@@ -80,20 +82,41 @@ public class MqttConfig {
     }
 
     @Bean
-    public MessageChannel mqttInputChannel() {
+    public MessageChannel mqttStatusInputChannel() {
         return new DirectChannel();
     }
 
     @Bean
-    public MqttPahoMessageDrivenChannelAdapter inbound() {
-        String topic = "/devices/+/status/+";
+    public MqttPahoMessageDrivenChannelAdapter inboundStatusAdapter() {
+        String statusTopic = "/devices/+/status/+";
 
-        MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(clientId + "_inbound", mqttClientFactory(), topic);
+        MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
+                clientId + "_inbound_status", mqttClientFactory(), statusTopic);
 
         adapter.setCompletionTimeout(5000);
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(1);
-        adapter.setOutputChannel(mqttInputChannel());
+        adapter.setOutputChannel(mqttStatusInputChannel());
+
+        return adapter;
+    }
+
+    @Bean
+    public MessageChannel mqttRequestInputChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MqttPahoMessageDrivenChannelAdapter inboundRequestAdapter() {
+        String requestTopic = "/devices/+/request/+";
+
+        MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
+                clientId + "_inbound_request", mqttClientFactory(), requestTopic);
+
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        adapter.setOutputChannel(mqttRequestInputChannel());
 
         return adapter;
     }
