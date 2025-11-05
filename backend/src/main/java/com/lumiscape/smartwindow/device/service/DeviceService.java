@@ -9,6 +9,9 @@ import com.lumiscape.smartwindow.device.repository.DeviceRepository;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
+import com.lumiscape.smartwindow.global.infra.S3Service;
+import com.lumiscape.smartwindow.media.domain.Media;
+import com.lumiscape.smartwindow.media.repository.MediaRepository;
 import com.lumiscape.smartwindow.user.domain.User;
 import com.lumiscape.smartwindow.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,8 @@ public class DeviceService {
 
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
+    private final MediaRepository mediaRepository;
+    private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
     private final ObjectMapper objectMapper;
 
@@ -138,6 +143,23 @@ public class DeviceService {
     }
 
     @Transactional
+    public DeviceDetailResponse updateDeviceMedia(Long userId, Long deviceId, Long mediaId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        Media media = null;
+        if (mediaId != null) {
+            media = mediaRepository.findByIdAndUserId(mediaId, userId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
+        }
+
+        device.updateMedia(media);
+
+        publishMediaUpdateToDevice(device);
+
+        return DeviceDetailResponse.from(device);
+    }
+
+    @Transactional
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
@@ -169,6 +191,23 @@ public class DeviceService {
             log.error("Failed to serialize MQTT payload", e);
 
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public void publishMediaUpdateToDevice(Device device) {
+        Media media = device.getMedia();
+
+        Long mediaId = null;
+        String mediaUrl = null;
+
+        if (media != null) {
+            mediaId = media.getId();
+
+            mediaUrl = s3Service.generatePresignedUrlForDownload(media.getFileUrl());
+
+            Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
+
+            publishMqttCommand(device.getDeviceUniqueId(), "media", payload);
         }
     }
 }

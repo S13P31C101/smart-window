@@ -117,4 +117,13 @@ public class DeviceController {
 
         return ApiResponse.onSuccess(response);
     }
+
+    @PutMapping("/{device-id}/media")
+    public ApiResponse<DeviceDetailResponse> updateDeviceMedia(@PathVariable("device-id") Long deviceId,
+                                                               @RequestBody DeviceMediaUpdateRequest request) {
+        Long userId = getMockUserId();
+        DeviceDetailResponse response = deviceService.updateDeviceMedia(userId, deviceId, request.mediaId());
+
+        return ApiResponse.onSuccess(response);
+    }
 }
