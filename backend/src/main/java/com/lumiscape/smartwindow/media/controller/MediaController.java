@@ -21,6 +21,7 @@ public class MediaController {
 
     @GetMapping
     public ApiResponse<List<MediaResponse>> getMyMedia( Long userId) {
+        userId = 1L;
         List<MediaResponse> responses = mediaService.getMyMedia(userId);
 
         return ApiResponse.onSuccess(responses);
@@ -29,6 +30,7 @@ public class MediaController {
     @GetMapping("/upload")
     public ApiResponse<MediaUploadResponse> getUploadUrl(Long userId,
                                                          @RequestBody MediaUploadRequest request) {
+        userId = 1L;
         MediaUploadResponse response = mediaService.getUploadUrl(userId, request);
 
         return ApiResponse.onSuccess(response);
@@ -37,6 +39,7 @@ public class MediaController {
     @PostMapping("/upload")
     public ApiResponse<MediaResponse> registerMedia(Long userId,
                                                     @RequestBody MediaRegisterRequest request) {
+        userId = 1L;
         MediaResponse response = mediaService.registerMedia(userId, request);
 
         return ApiResponse.onSuccess(response);
@@ -45,6 +48,7 @@ public class MediaController {
     @GetMapping("/{media-id}")
     public ApiResponse<MediaResponse> getMediaDetail( Long userId,
                                                       @PathVariable("media-id") Long mediaId) {
+        userId = 1L;
         MediaResponse response = mediaService.getMediaDetail(userId, mediaId);
 
         return ApiResponse.onSuccess(response);
@@ -54,7 +58,8 @@ public class MediaController {
     public ApiResponse<MediaResponse> updateMediaName( Long userId,
                                                        @PathVariable("media-id") Long mediaId,
                                                        @RequestBody Map<String, String> request) {
-        String newName = request.get("name");
+        userId = 1L;
+        String newName = request.get("fileName");
 
         if (newName == null || newName.isBlank()) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
@@ -68,6 +73,7 @@ public class MediaController {
     @DeleteMapping("/{media-id}")
     public ApiResponse<?> deleteMedia( Long userId,
                                        @PathVariable("media-id") Long mediaId) {
+        userId = 1L;
         mediaService.deleteMedia(userId, mediaId);
 
         return ApiResponse.onSuccess();

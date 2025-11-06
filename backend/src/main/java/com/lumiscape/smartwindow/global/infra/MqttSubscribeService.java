@@ -22,7 +22,7 @@ public class MqttSubscribeService {
 
     @ServiceActivator(inputChannel = MqttConfig.MQTT_STATUS_INPUT_CHANNEL)
     public void handleStatusMessage(Message<String> message) {
-        String topic = (String) message.getHeaders().get(MqttHeaders.TOPIC);
+        String topic = (String) message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC);
         String payload = message.getPayload();
 
         String[] parts = topic.split("/");
@@ -45,7 +45,7 @@ public class MqttSubscribeService {
 
     @ServiceActivator(inputChannel = MqttConfig.MQTT_REQUEST_INPUT_CHANNEL)
     public void handleRequestMessage(Message<String> message) {
-        String topic = (String) message.getHeaders().get(MqttHeaders.TOPIC);
+        String topic = (String) message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC);
         String payload = message.getPayload();
 
         String[] parts = topic.split("/");
