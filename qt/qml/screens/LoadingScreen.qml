@@ -45,7 +45,7 @@ Item {
             Component.onCompleted: { opacity = 1.0; scale = 1.0 }
         }
 
-        // 안전한 MultiEffect 적용 (layer.effect 대신)
+        // 안전한 MultiEffect 적용
         MultiEffect {
             anchors.fill: brand
             source: brand
@@ -78,7 +78,6 @@ Item {
             border.color: "#55aeeeff"
             transform: Rotation { id: outerRot; origin.x: width/2; origin.y: height/2; angle: 0 }
         }
-        // ✔ 점 표기 대신 target+property 사용
         NumberAnimation {
             target: outerRot
             property: "angle"
@@ -116,7 +115,6 @@ Item {
                 ctx.stroke()
             }
         }
-        // ✔ 점 표기 대신 target+property 사용
         NumberAnimation {
             target: innerRot
             property: "angle"
@@ -146,7 +144,6 @@ Item {
                 NumberAnimation { to: 0.5; duration: 750; easing.type: Easing.InOutQuad }
             }
         }
-        // 안전한 MultiEffect 적용 (layer.effect 대신)
         MultiEffect {
             anchors.fill: coreDot
             source: coreDot
@@ -158,7 +155,7 @@ Item {
             shadowBlur: 0.9
         }
 
-        // innerRing에 드롭섀도 살짝
+        // innerRing에 드롭섀도
         MultiEffect {
             anchors.fill: innerRing
             source: innerRing
@@ -179,7 +176,6 @@ Item {
         font.letterSpacing: 4
         opacity: 0.0
 
-        // 등장 후 점멸
         SequentialAnimation {
             running: true
             NumberAnimation { target: bootText; property: "opacity"; from: 0; to: 1; duration: 500; easing.type: Easing.OutQuad }

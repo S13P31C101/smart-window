@@ -1,0 +1,36 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- QML Files -->
+        <file>../qml/Main.qml</file>
+
+        <!-- Screens -->
+        <file>../qml/screens/LoadingScreen.qml</file>
+        <file>../qml/screens/MenuScreen.qml</file>
+        <file>../qml/screens/CustomModeScreen.qml</file>
+        <file>../qml/screens/GlassModeScreen.qml</file>
+        <file>../qml/screens/PrivacyModeScreen.qml</file>
+        <file>../qml/screens/AutoModeScreen.qml</file>
+
+        <!-- Components -->
+        <file>../qml/components/GestureCursor.qml</file>
+        <file>../qml/components/RadialMenu.qml</file>
+        <file>../qml/components/AmbientGlow.qml</file>
+        <file>../qml/components/GlassCard.qml</file>
+
+        <!-- Widgets -->
+        <file>../qml/widgets/ClockWidget.qml</file>
+        <file>../qml/widgets/WeatherWidget.qml</file>
+        <file>../qml/widgets/SpotifyWidget.qml</file>
+        <file>../qml/widgets/QuoteWidget.qml</file>
+
+        <!-- Styles -->
+        <file>../qml/styles/Theme.qml</file>
+        <file>../qml/styles/Effects.qml</file>
+        <file>../qml/styles/qmldir</file>
+
+        <!-- Assets -->
+        <file>../assets/presets/config.json</file>
+        <file>../assets/presets/widgets.json</file>
+        <file>../assets/presets/auto_scenes.json</file>
+    </qresource>
+</RCC>

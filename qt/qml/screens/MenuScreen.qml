@@ -6,7 +6,24 @@ import QtQuick.Effects
 Item {
     id: root
     width: 1080; height: 1920
-    signal navigateTo(string screenId)   // "CustomModeScreen" 등으로 보낼 목적지
+
+    // 초기화 및 정리
+    Component.onCompleted: {
+        console.log("MenuScreen loaded")
+        // 초기 상태 설정
+        hoveredIndex = -1
+        // 글로우 애니메이션 재시작 (scale과 opacity 초기화)
+        glowA.scale = 1.0
+        glowA.opacity = 0.12
+        glowB.scale = 1.0
+        glowB.opacity = 0.10
+        // 중심 장식 초기화
+        centerDeco.scale = 1.0
+    }
+
+    Component.onDestruction: {
+        console.log("MenuScreen unloaded")
+    }
 
     // ====== 배경 ======
     Rectangle {
@@ -71,27 +88,31 @@ Item {
             font.pixelSize: 64
             font.weight: Font.DemiBold
             horizontalAlignment: Text.AlignHCenter
+            anchors.horizontalCenter: parent.horizontalCenter
         }
         Text {
             text: "Select with a tap or gesture"
             color: "#64748b"   // slate-500
             font.pixelSize: 20
             horizontalAlignment: Text.AlignHCenter
+            anchors.horizontalCenter: parent.horizontalCenter
         }
     }
 
     // ====== 라디얼 메뉴 ======
     // 모드 정의
     readonly property var modes: [
-        { id: "CustomModeScreen",  label: "Custom",          icon: "🎨", gradientA: "#8b5cf6", gradientB: "#ec4899" }, // purple→pink
-        { id: "GlassModeScreen",   label: "Glass",           icon: "🌫️", gradientA: "#06b6d4", gradientB: "#3b82f6" }, // cyan→blue
-        { id: "PrivacyModeScreen", label: "Privacy",         icon: "🔒", gradientA: "#334155", gradientB: "#475569" }, // slate
-        { id: "AutoModeScreen",    label: "Auto Recommend",  icon: "☀️", gradientA: "#f59e0b", gradientB: "#f97316" }  // amber→orange
+        { id: "custom",  label: "Custom",          icon: "🎨", gradientA: "#8b5cf6", gradientB: "#ec4899" }, // purple→pink
+        { id: "glass",   label: "Glass",           icon: "🌫️", gradientA: "#06b6d4", gradientB: "#3b82f6" }, // cyan→blue
+        { id: "privacy", label: "Privacy",         icon: "🔒", gradientA: "#334155", gradientB: "#475569" }, // slate
+        { id: "auto",    label: "Auto Recommend",  icon: "☀️", gradientA: "#f59e0b", gradientB: "#f97316" }  // amber→orange
     ]
 
     // 커서 좌표 (정규화 → 픽셀)
-    property real cursorX: gestureBridge.normalizedX * width
-    property real cursorY: gestureBridge.normalizedY * height
+    property real cursorX: (typeof gestureBridge !== 'undefined' && gestureBridge.cursorX !== undefined)
+                           ? gestureBridge.cursorX * width : width * 0.5
+    property real cursorY: (typeof gestureBridge !== 'undefined' && gestureBridge.cursorY !== undefined)
+                           ? gestureBridge.cursorY * height : height * 0.5
 
     // 현재 hover 중인 인덱스 (-1: 없음)
     property int hoveredIndex: -1
@@ -114,8 +135,6 @@ Item {
         color: "#1ad1ff22" // cyan-500/20
         border.color: "#ffffff18"; border.width: 1
         MultiEffect { anchors.fill: centerDeco; source: centerDeco; blurEnabled: true; blur: 0.35 }
-        // transform: Rotation { id: decoRot; origin.x: width/2; origin.y: height/2; angle: 0 }
-        // NumberAnimation on decoRot.angle { from: 0; to: 360; duration: 20000; loops: Animation.Infinite; easing.type: Easing.Linear }
         SequentialAnimation on scale {
             loops: Animation.Infinite
             NumberAnimation { to: 1.05; duration: 2000; easing.type: Easing.InOutQuad }
@@ -148,7 +167,6 @@ Item {
                 radius: 24
                 border.color: "#ffffff18"; border.width: 1
                 gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(Qt.colorEqual(m.gradientA, undefined) ? 0.3 : 0.0, 0, 0, 0.2) }
                     GradientStop { position: 0.0; color: m.gradientA + "33" } // xx/20 비슷
                     GradientStop { position: 1.0; color: m.gradientB + "33" }
                 }
@@ -168,19 +186,32 @@ Item {
                 Column {
                     anchors.centerIn: parent
                     spacing: 8
-                    Text { text: m.icon; font.pixelSize: 56; horizontalAlignment: Text.AlignHCenter }
-                    Text { text: m.label; color: "white"; font.pixelSize: 20; font.weight: Font.Medium; horizontalAlignment: Text.AlignHCenter }
+                    Text {
+                        text: m.icon
+                        font.pixelSize: 56
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: m.label
+                        color: "white"
+                        font.pixelSize: 20
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
                     // 설명: hover 시만 노출
                     Text {
-                        text: m.id === "CustomModeScreen"  ? "Personalize your display" :
-                              m.id === "GlassModeScreen"   ? "Transparent ambient view" :
-                              m.id === "PrivacyModeScreen" ? "Focus & concentration" :
-                                                             "Smart mood detection"
+                        text: m.id === "custom"  ? "Personalize your display" :
+                              m.id === "glass"   ? "Transparent ambient view" :
+                              m.id === "privacy" ? "Focus & concentration" :
+                                                   "Smart mood detection"
                         color: "#ffffff80"
                         font.pixelSize: 12
                         opacity: hoveredIndex === idx ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 180 } }
                         horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
                     }
                 }
 
@@ -190,28 +221,26 @@ Item {
                     hoverEnabled: true
                     onEntered: hoveredIndex = idx
                     onExited: if (hoveredIndex === idx) hoveredIndex = -1
-                    onClicked: root.navigateTo(m.id)
+                    onClicked: router.navigateTo(m.id)
                 }
             }
         }
     }
 
     // ====== 커서 (mediapipe 제스처 포인터) ======
-    // 실제 좌표에 맞게 렌더
     Rectangle {
         id: cursor
         width: 32; height: 32; radius: 16
         x: cursorX - width/2
         y: cursorY - height/2
         color: "white"; opacity: 0.9
+        visible: typeof gestureBridge !== 'undefined' && gestureBridge.handDetected
         MultiEffect { anchors.fill: cursor; source: cursor; blurEnabled: true; blur: 0.25; shadowEnabled: true; shadowOpacity: 0.4 }
-        // hover 피드백(작게 튀도록)
         Behavior on scale { NumberAnimation { duration: 100 } }
         scale: hoveredIndex >= 0 ? 1.15 : 1.0
     }
 
     // ====== hover 판정 타이머 ======
-    // 커서와 각 카드 중심 사이 거리로 hoverIndex 결정
     Timer {
         interval: 60; running: true; repeat: true
         onTriggered: {
@@ -233,32 +262,56 @@ Item {
 
     // ====== 제스처 이벤트: 주먹=클릭 → 선택 ======
     Connections {
-        target: gestureBridge
-        // fistClick이 들어오면 현재 hover 대상 선택
-        onFistClick: {
+        target: typeof gestureBridge !== 'undefined' ? gestureBridge : null
+        function onFistDetected() {
             if (hoveredIndex >= 0) {
                 const id = modes[hoveredIndex].id
-                root.navigateTo(id)
+                router.navigateTo(id)
             }
         }
     }
 
     // ====== 하단 힌트 ======
     Row {
+        id: hintRow
         spacing: 8
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom; anchors.bottomMargin: 24
         opacity: 0.0
-        NumberAnimation on opacity { from: 0; to: 1; duration: 1000; running: true;}
+
+        NumberAnimation on opacity {
+            id: hintFadeIn
+            from: 0; to: 1
+            duration: 1000
+            running: false
+        }
+
         Text {
+            id: hintEmoji
             text: "☝️"
             font.pixelSize: 20
+            property real baseY: 0
+
             SequentialAnimation on y {
+                id: emojiAnim
                 loops: Animation.Infinite
-                NumberAnimation { to: y - 5; duration: 1000; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 0;     duration: 1000; easing.type: Easing.InOutQuad }
+                running: false
+                NumberAnimation { to: hintEmoji.baseY - 5; duration: 1000; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: hintEmoji.baseY; duration: 1000; easing.type: Easing.InOutQuad }
             }
         }
         Text { text: "Hover to preview • Fist to select"; color: "#64748b"; font.pixelSize: 16 }
+    }
+
+    // 화면 로드 시 애니메이션 시작
+    Timer {
+        id: initTimer
+        interval: 100
+        running: true
+        repeat: false
+        onTriggered: {
+            hintFadeIn.start()
+            emojiAnim.start()
+        }
     }
 }

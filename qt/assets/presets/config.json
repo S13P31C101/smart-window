@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "screenWidth": 1920,
+  "screenHeight": 1080,
+  "theme": "dark",
+  "gestureEnabled": true,
+
+  "mqtt": {
+    "host": "localhost",
+    "port": 1883,
+    "username": "",
+    "password": "",
+    "clientId": "lumiscape_client"
+  },
+
+  "apis": {
+    "weather": {
+      "apiKey": "YOUR_OPENWEATHERMAP_API_KEY",
+      "apiUrl": "https://api.openweathermap.org/data/2.5",
+      "defaultCity": "Seoul",
+      "updateIntervalMinutes": 10
+    },
+    "spotify": {
+      "clientId": "YOUR_SPOTIFY_CLIENT_ID",
+      "clientSecret": "YOUR_SPOTIFY_CLIENT_SECRET",
+      "redirectUri": "http://localhost:8888/callback",
+      "scopes": "user-read-playback-state user-modify-playback-state"
+    }
+  },
+
+  "mediapipe": {
+    "cameraId": 0,
+    "minDetectionConfidence": 0.7,
+    "minTrackingConfidence": 0.5
+  },
+
+  "widgets": {
+    "clock": {
+      "enabled": true,
+      "format24Hour": false,
+      "showSeconds": true
+    },
+    "weather": {
+      "enabled": true,
+      "autoUpdate": true
+    },
+    "spotify": {
+      "enabled": true,
+      "autoPlay": false
+    },
+    "quote": {
+      "enabled": true,
+      "changeIntervalSeconds": 30
+    }
+  },
+
+  "modes": {
+    "default": "menu",
+    "custom": {
+      "allowDrag": true,
+      "snapToGrid": false
+    },
+    "glass": {
+      "transparency": 0.9,
+      "blur": 40
+    },
+    "privacy": {
+      "hideAllContent": true
+    },
+    "auto": {
+      "weatherBasedRecommendations": true,
+      "timeBasedRecommendations": true
+    }
+  }
+}

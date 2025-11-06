@@ -1,0 +1,51 @@
+{
+  "widgets": [
+    {
+      "id": "clock",
+      "type": "clock",
+      "position": { "x": 100, "y": 100 },
+      "size": { "width": 300, "height": 200 },
+      "visible": true,
+      "config": {
+        "format": "24h",
+        "showDate": true,
+        "showPeriod": true
+      }
+    },
+    {
+      "id": "weather",
+      "type": "weather",
+      "position": { "x": 500, "y": 100 },
+      "size": { "width": 300, "height": 200 },
+      "visible": true,
+      "config": {
+        "city": "Seoul",
+        "units": "metric",
+        "showHumidity": true,
+        "showWind": true
+      }
+    },
+    {
+      "id": "spotify",
+      "type": "spotify",
+      "position": { "x": 100, "y": 400 },
+      "size": { "width": 400, "height": 250 },
+      "visible": false,
+      "config": {
+        "showAlbumArt": true,
+        "showControls": true
+      }
+    },
+    {
+      "id": "quote",
+      "type": "quote",
+      "position": { "x": 900, "y": 400 },
+      "size": { "width": 400, "height": 200 },
+      "visible": true,
+      "config": {
+        "autoChange": true,
+        "interval": 30
+      }
+    }
+  ]
+}
