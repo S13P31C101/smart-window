@@ -1,0 +1,118 @@
+{
+  "scenes": [
+    {
+      "id": "morning",
+      "name": "Morning Routine",
+      "conditions": {
+        "timeRange": { "start": "05:00", "end": "12:00" }
+      },
+      "config": {
+        "theme": "light",
+        "widgets": ["clock", "weather", "quote"],
+        "music": {
+          "genre": "energetic",
+          "playlist": "morning_motivation"
+        },
+        "ambiance": {
+          "color": "#FDB372",
+          "brightness": 0.8
+        }
+      }
+    },
+    {
+      "id": "afternoon",
+      "name": "Afternoon Focus",
+      "conditions": {
+        "timeRange": { "start": "12:00", "end": "17:00" }
+      },
+      "config": {
+        "theme": "neutral",
+        "widgets": ["clock", "weather"],
+        "music": {
+          "genre": "focus",
+          "playlist": "deep_work"
+        },
+        "ambiance": {
+          "color": "#60A5FA",
+          "brightness": 0.7
+        }
+      }
+    },
+    {
+      "id": "evening",
+      "name": "Evening Relaxation",
+      "conditions": {
+        "timeRange": { "start": "17:00", "end": "21:00" }
+      },
+      "config": {
+        "theme": "warm",
+        "widgets": ["clock", "weather", "spotify", "quote"],
+        "music": {
+          "genre": "relaxing",
+          "playlist": "evening_chill"
+        },
+        "ambiance": {
+          "color": "#F472B6",
+          "brightness": 0.6
+        }
+      }
+    },
+    {
+      "id": "night",
+      "name": "Night Mode",
+      "conditions": {
+        "timeRange": { "start": "21:00", "end": "05:00" }
+      },
+      "config": {
+        "theme": "dark",
+        "widgets": ["clock"],
+        "music": {
+          "genre": "ambient",
+          "playlist": "sleep_sounds"
+        },
+        "ambiance": {
+          "color": "#1E293B",
+          "brightness": 0.3
+        }
+      }
+    },
+    {
+      "id": "rainy",
+      "name": "Rainy Day",
+      "conditions": {
+        "weather": ["rain", "drizzle", "thunderstorm"]
+      },
+      "config": {
+        "theme": "cool",
+        "widgets": ["clock", "weather", "quote"],
+        "music": {
+          "genre": "cozy",
+          "playlist": "rainy_day"
+        },
+        "ambiance": {
+          "color": "#60A5FA",
+          "brightness": 0.5
+        }
+      }
+    },
+    {
+      "id": "sunny",
+      "name": "Sunny Day",
+      "conditions": {
+        "weather": ["clear"]
+      },
+      "config": {
+        "theme": "bright",
+        "widgets": ["clock", "weather", "spotify"],
+        "music": {
+          "genre": "upbeat",
+          "playlist": "sunshine_vibes"
+        },
+        "ambiance": {
+          "color": "#FBBF24",
+          "brightness": 0.9
+        }
+      }
+    }
+  ]
+}
