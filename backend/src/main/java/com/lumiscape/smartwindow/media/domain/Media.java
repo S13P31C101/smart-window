@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -32,7 +34,7 @@ public class Media {
     @Column(name = "file_url", nullable = false)
     private String fileUrl;
 
-    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "file_type", nullable = false, columnDefinition = "media_type_enum")
     private MediaType fileType;
 
@@ -46,8 +48,8 @@ public class Media {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "original_type", nullable = false, columnDefinition = "media_origin_enum")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "origin_type", nullable = false, columnDefinition = "media_origin_enum")
     private MediaOrigin originType;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -21,13 +21,13 @@ public record DeviceDetailResponse(
     public static DeviceDetailResponse from(Device device) {
         return new DeviceDetailResponse(
                 device.getId(),
-                device.getDeviceName(),
                 device.getDeviceUniqueId(),
+                device.getDeviceName(),
                 device.isPowerStatus(),
                 device.isOpenStatus(),
                 device.getModeStatus(),
                 device.getModeSettings(),
-                null, // device.getMedia() != null ? device.getMedia().getId() : null,
+                device.getMedia() != null ? device.getMedia().getId() : null,
                 device.getCreatedAt()
         );
     }
