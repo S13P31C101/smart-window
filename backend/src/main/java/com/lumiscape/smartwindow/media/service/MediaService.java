@@ -14,10 +14,15 @@ import com.lumiscape.smartwindow.user.domain.User;
 import com.lumiscape.smartwindow.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,11 +38,14 @@ public class MediaService {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
-
     private final @Lazy DeviceService deviceService;
+    private final RestTemplate restTemplate;
 
-//    @Value("${app.ai.secret")
+    @Value("${app.ai.secret}")
     private String aiCallbackSecret;
+
+    @Value("${app.ai.server-url}")
+    private String aiServerUrl;
 
     public List<MediaResponse> getMyMedia(Long userId) {
         List<Media> mediaList = mediaRepository.findAllByUserId(userId);
@@ -52,6 +60,13 @@ public class MediaService {
         String s3ObjectKey = createS3ObjectKey(request.fileName());
         String uploadUrl = s3Service.generatePresignedUrlForUpload(s3ObjectKey);
 
+        return new MediaUploadResponse(s3ObjectKey, uploadUrl);
+    }
+
+    public MediaUploadResponse getAIUploadUrl(String token, AIUploadUrlRequest request) {
+        verifyAIToken(token);
+        String s3ObjectKey = request.s3ObjectKey();
+        String uploadUrl = s3Service.generatePresignedUrlForUpload(s3ObjectKey);
         return new MediaUploadResponse(s3ObjectKey, uploadUrl);
     }
 
@@ -128,18 +143,16 @@ public class MediaService {
 
     @Transactional
     public void handleAICallback(String token, AICallbackRequest request) {
-        if (aiCallbackSecret == null || aiCallbackSecret.isBlank() || !aiCallbackSecret.equals(token)) {
-            log.warn("AI TOKEN 불일치 : {}", token);
-
-            throw new CustomException(ErrorCode.ACCESS_DENIED);
-        }
+        verifyAIToken(token);
 
         Media parentMedia = mediaRepository.findById(request.parentMediaId())
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
 
+        String aiFileName = addSuffixBeforeExtension(parentMedia.getFileName(), "(AI)");
+
         Media aiMedia = Media.builder()
                 .user(parentMedia.getUser())
-                .fileName(parentMedia.getFileName() + "(AI)")
+                .fileName(aiFileName)
                 .fileUrl(request.s3ObjectKey())
                 .fileType(request.fileType())
                 .fileSize(request.fileSize())
@@ -153,9 +166,43 @@ public class MediaService {
         // TODO FCM Push
     }
 
-    @Async("taskExcutor")
+    @Async("taskExecutor")
     public void requestAIGeneration(Media originMedia) {
-        // TODO
+        String presignedDownloadUrl = s3Service.generatePresignedUrlForDownload(originMedia.getFileUrl());
+        String targetAiS3Key = addSuffixBeforeExtension(originMedia.getFileUrl(), "_AI");
+
+        AIRequest aiRequest = new AIRequest(originMedia.getId(), presignedDownloadUrl, targetAiS3Key);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<AIRequest> requestEntity = new HttpEntity<>(aiRequest, headers);
+
+        try {
+            log.info("AI 서버에 이미지 생성을 요청합니다. Media ID: {}", originMedia.getId());
+            restTemplate.postForEntity(aiServerUrl + "/api/ai/images", requestEntity, String.class);
+            log.info("AI 서버에 성공적으로 요청했습니다. Media ID: {}", originMedia.getId());
+        } catch (Exception e) {
+            log.error("AI 서버 요청 실패. Media ID: {}", originMedia.getId(), e);
+        }
+    }
+
+    private void verifyAIToken(String token) {
+        if (aiCallbackSecret == null || aiCallbackSecret.isBlank() || !aiCallbackSecret.equals(token)) {
+            log.warn("AI TOKEN 불일치 : {}", token);
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+    }
+
+    private String addSuffixBeforeExtension(String fileName, String suffix) {
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex == -1) {
+            return fileName + suffix;
+        } else {
+            String name = fileName.substring(0, dotIndex);
+            String extension = fileName.substring(dotIndex);
+            return name + suffix + extension;
+        }
     }
 
     private Media findMediaByUser(Long mediaId, Long userId) {

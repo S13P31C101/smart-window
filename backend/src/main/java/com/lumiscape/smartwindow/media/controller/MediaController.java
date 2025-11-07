@@ -27,7 +27,7 @@ public class MediaController {
         return ApiResponse.onSuccess(responses);
     }
 
-    @GetMapping("/upload")
+    @PostMapping("/upload-url")
     public ApiResponse<MediaUploadResponse> getUploadUrl(Long userId,
                                                          @RequestBody MediaUploadRequest request) {
         userId = 1L;
@@ -77,6 +77,14 @@ public class MediaController {
         mediaService.deleteMedia(userId, mediaId);
 
         return ApiResponse.onSuccess();
+    }
+
+    @PostMapping("/ai-upload-url")
+    public ApiResponse<MediaUploadResponse> getAIUploadUrl(@RequestHeader("X-AI-Token") String token,
+                                                           @RequestBody AIUploadUrlRequest request) {
+        MediaUploadResponse response = mediaService.getAIUploadUrl(token, request);
+
+        return ApiResponse.onSuccess(response);
     }
 
     @PostMapping("/ai-callback")
