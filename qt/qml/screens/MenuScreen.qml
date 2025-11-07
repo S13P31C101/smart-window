@@ -10,40 +10,43 @@ Item {
     // 초기화 및 정리
     Component.onCompleted: {
         console.log("MenuScreen loaded")
-        // 초기 상태 설정
+        // 초기 상태만 설정 (애니메이션 속성은 건드리지 않음)
         hoveredIndex = -1
-        // 글로우 애니메이션 재시작 (scale과 opacity 초기화)
-        glowA.scale = 1.0
-        glowA.opacity = 0.12
-        glowB.scale = 1.0
-        glowB.opacity = 0.10
-        // 중심 장식 초기화
-        centerDeco.scale = 1.0
     }
 
     Component.onDestruction: {
         console.log("MenuScreen unloaded")
     }
 
+    // 화면이 보일 때만 애니메이션 실행
+    visible: true
+
     // ====== 배경 ======
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#020617" } // slate-950
-            GradientStop { position: 0.6; color: "#0b1220" } // slate-900
-            GradientStop { position: 1.0; color: "#020617" } // slate-950
+            GradientStop { position: 0.0; color: "#0f172a" } // slate-900 (더 밝게)
+            GradientStop { position: 0.6; color: "#1e293b" } // slate-800 (더 밝게)
+            GradientStop { position: 1.0; color: "#0f172a" } // slate-900 (더 밝게)
         }
     }
 
-    // 앰비언트 글로우 1
+    // 앰비언트 글로우 1 (반응형)
     Rectangle {
         id: glowA
-        width: 380; height: 380; radius: width/2
-        anchors.left: parent.left; anchors.leftMargin: parent.width * 0.25 - width/2
-        anchors.top: parent.top; anchors.topMargin: parent.height * 0.25 - height/2
+        property real glowSize: Math.min(root.width, root.height) * 0.35
+        width: glowSize; height: glowSize; radius: width/2
+        anchors.left: parent.left
+        anchors.leftMargin: parent.width * 0.25 - width/2
+        anchors.top: parent.top
+        anchors.topMargin: parent.height * 0.25 - height/2
         color: "#1acff3"   // cyan-500/10 비슷
         opacity: 0.12
-        MultiEffect { anchors.fill: glowA; source: glowA; blurEnabled: true; blur: 0.9 }
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blur: 0.9
+        }
         SequentialAnimation on scale {
             loops: Animation.Infinite
             NumberAnimation { to: 1.2; duration: 4000; easing.type: Easing.InOutQuad }
@@ -56,15 +59,22 @@ Item {
         }
     }
 
-    // 앰비언트 글로우 2
+    // 앰비언트 글로우 2 (반응형)
     Rectangle {
         id: glowB
-        width: 380; height: 380; radius: width/2
-        anchors.right: parent.right; anchors.rightMargin: parent.width * 0.25 - width/2
-        anchors.bottom: parent.bottom; anchors.bottomMargin: parent.height * 0.25 - height/2
+        property real glowSize: Math.min(root.width, root.height) * 0.35
+        width: glowSize; height: glowSize; radius: width/2
+        anchors.right: parent.right
+        anchors.rightMargin: parent.width * 0.25 - width/2
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: parent.height * 0.25 - height/2
         color: "#3b82f6"   // blue-500/10 비슷
         opacity: 0.10
-        MultiEffect { anchors.fill: glowB; source: glowB; blurEnabled: true; blur: 0.95 }
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blur: 0.95
+        }
         SequentialAnimation on scale {
             loops: Animation.Infinite
             NumberAnimation { to: 1.15; duration: 5000; easing.type: Easing.InOutQuad }
@@ -77,15 +87,16 @@ Item {
         }
     }
 
-    // ====== 타이틀 ======
+    // ====== 타이틀 (반응형) ======
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top; anchors.topMargin: 120
-        spacing: 8
+        anchors.top: parent.top
+        anchors.topMargin: root.height * 0.063
+        spacing: root.height * 0.004
         Text {
             text: "Choose Your Mode"
             color: "#e2e8f0"   // slate-200~300
-            font.pixelSize: 64
+            font.pixelSize: Math.min(root.width, root.height) * 0.059
             font.weight: Font.DemiBold
             horizontalAlignment: Text.AlignHCenter
             anchors.horizontalCenter: parent.horizontalCenter
@@ -93,7 +104,7 @@ Item {
         Text {
             text: "Select with a tap or gesture"
             color: "#64748b"   // slate-500
-            font.pixelSize: 20
+            font.pixelSize: Math.min(root.width, root.height) * 0.0185
             horizontalAlignment: Text.AlignHCenter
             anchors.horizontalCenter: parent.horizontalCenter
         }
@@ -117,42 +128,54 @@ Item {
     // 현재 hover 중인 인덱스 (-1: 없음)
     property int hoveredIndex: -1
 
-    // 버튼 원의 중심과 반경
-    property real circleSize: 600
-    property real radius: 240
+    // 버튼 원의 중심과 반경 (반응형)
+    property real radius: Math.min(width, height) * 0.22  // 화면 크기에 비례
     property real centerX: width/2
-    property real centerY: height/2 + 80
+    property real centerY: height/2 + height * 0.04
 
-    // hover 판정 임계거리(px)
-    property real hoverThreshold: 140
+    // hover 판정 임계거리 (반응형)
+    property real hoverThreshold: Math.min(width, height) * 0.13
 
-    // 중심 장식
+    // 버튼 크기 (반응형)
+    property real buttonSize: Math.min(width, height) * 0.16
+
+    // 중심 장식 (반응형)
     Rectangle {
         id: centerDeco
-        width: 96; height: 96; radius: 48
+        property real decoSize: Math.min(root.width, root.height) * 0.089
+        width: decoSize; height: decoSize; radius: decoSize/2
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: 80
+        anchors.verticalCenterOffset: root.height * 0.04
         color: "#1ad1ff22" // cyan-500/20
         border.color: "#ffffff18"; border.width: 1
-        MultiEffect { anchors.fill: centerDeco; source: centerDeco; blurEnabled: true; blur: 0.35 }
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blur: 0.35
+        }
         SequentialAnimation on scale {
             loops: Animation.Infinite
             NumberAnimation { to: 1.05; duration: 2000; easing.type: Easing.InOutQuad }
             NumberAnimation { to: 1.0;  duration: 2000; easing.type: Easing.InOutQuad }
         }
         Rectangle {
-            width: 48; height: 48; radius: 24
+            width: parent.width * 0.5; height: parent.height * 0.5
+            radius: width/2
             anchors.centerIn: parent
             color: "#66d1ff33"
-            MultiEffect { anchors.fill: parent; source: parent; blurEnabled: true; blur: 0.25 }
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blur: 0.25
+            }
         }
     }
 
-    // 4개 버튼 배치
+    // 4개 버튼 배치 (반응형)
     Repeater {
         model: modes.length
         delegate: Item {
-            width: 176; height: 176
+            width: buttonSize; height: buttonSize
             property int idx: index
             property var m: modes[idx]
             property real angleDeg: (idx * 90) - 45   // 상단 우측부터 시계방향
@@ -174,28 +197,29 @@ Item {
                 scale: hoveredIndex === idx ? 1.1 : 1.0
                 Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-                // 글로우
-                MultiEffect {
-                    anchors.fill: card
-                    source: card
-                    blurEnabled: true; blur: hoveredIndex === idx ? 0.35 : 0.2
-                    shadowEnabled: true; shadowOpacity: hoveredIndex === idx ? 0.45 : 0.25
+                // 그림자만 적용 (블러 제거로 선명하게)
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    shadowEnabled: true
+                    shadowOpacity: hoveredIndex === idx ? 0.6 : 0.4
+                    shadowBlur: 0.8
+                    shadowColor: "#000000"
                 }
 
-                // 내용
+                // 내용 (반응형)
                 Column {
                     anchors.centerIn: parent
-                    spacing: 8
+                    spacing: buttonSize * 0.045
                     Text {
                         text: m.icon
-                        font.pixelSize: 56
+                        font.pixelSize: buttonSize * 0.32
                         horizontalAlignment: Text.AlignHCenter
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                     Text {
                         text: m.label
                         color: "white"
-                        font.pixelSize: 20
+                        font.pixelSize: buttonSize * 0.11
                         font.weight: Font.Medium
                         horizontalAlignment: Text.AlignHCenter
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -207,7 +231,7 @@ Item {
                               m.id === "privacy" ? "Focus & concentration" :
                                                    "Smart mood detection"
                         color: "#ffffff80"
-                        font.pixelSize: 12
+                        font.pixelSize: buttonSize * 0.068
                         opacity: hoveredIndex === idx ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 180 } }
                         horizontalAlignment: Text.AlignHCenter
@@ -227,15 +251,22 @@ Item {
         }
     }
 
-    // ====== 커서 (mediapipe 제스처 포인터) ======
+    // ====== 커서 (mediapipe 제스처 포인터, 반응형) ======
     Rectangle {
         id: cursor
-        width: 32; height: 32; radius: 16
+        property real cursorSize: Math.min(root.width, root.height) * 0.03
+        width: cursorSize; height: cursorSize; radius: cursorSize/2
         x: cursorX - width/2
         y: cursorY - height/2
         color: "white"; opacity: 0.9
         visible: typeof gestureBridge !== 'undefined' && gestureBridge.handDetected
-        MultiEffect { anchors.fill: cursor; source: cursor; blurEnabled: true; blur: 0.25; shadowEnabled: true; shadowOpacity: 0.4 }
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowOpacity: 0.6
+            shadowBlur: 0.5
+            shadowColor: "#000000"
+        }
         Behavior on scale { NumberAnimation { duration: 100 } }
         scale: hoveredIndex >= 0 ? 1.15 : 1.0
     }
@@ -271,12 +302,13 @@ Item {
         }
     }
 
-    // ====== 하단 힌트 ======
+    // ====== 하단 힌트 (반응형) ======
     Row {
         id: hintRow
-        spacing: 8
+        spacing: root.width * 0.0074
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom; anchors.bottomMargin: 24
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.height * 0.0125
         opacity: 0.0
 
         NumberAnimation on opacity {
@@ -289,18 +321,22 @@ Item {
         Text {
             id: hintEmoji
             text: "☝️"
-            font.pixelSize: 20
+            font.pixelSize: Math.min(root.width, root.height) * 0.0185
             property real baseY: 0
 
             SequentialAnimation on y {
                 id: emojiAnim
                 loops: Animation.Infinite
                 running: false
-                NumberAnimation { to: hintEmoji.baseY - 5; duration: 1000; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: hintEmoji.baseY - root.height * 0.0026; duration: 1000; easing.type: Easing.InOutQuad }
                 NumberAnimation { to: hintEmoji.baseY; duration: 1000; easing.type: Easing.InOutQuad }
             }
         }
-        Text { text: "Hover to preview • Fist to select"; color: "#64748b"; font.pixelSize: 16 }
+        Text {
+            text: "Hover to preview • Fist to select"
+            color: "#64748b"
+            font.pixelSize: Math.min(root.width, root.height) * 0.0148
+        }
     }
 
     // 화면 로드 시 애니메이션 시작
