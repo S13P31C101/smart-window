@@ -1,24 +1,35 @@
 pipeline {
-    agent any
+    agent none
+
+    def dockerAgent = {
+        docker {
+            image 'docker/compose:latest'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     stages {
         stage('Checkout') {
+            agent any
             steps {
                 checkout scm
             }
         }
                 
         stage('Build FastAPI Docker Image') {
+            agent dockerAgent
             steps {
+                sh 'docker --version'
                 sh 'docker build -t fastapi-reborn .'
             }
         }
 
         stage('Run Docker Compose') {
+            agent dockerAgent
             steps {
+                sh 'docker-compose --version'
                 dir('infra') {
                     sh 'docker-compose down'
-                    
                     sh 'docker-compose up -d --build'
                 }
             }
