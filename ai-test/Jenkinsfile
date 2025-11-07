@@ -1,13 +1,6 @@
 pipeline {
     agent none
 
-    def dockerAgent = {
-        docker {
-            image 'docker/compose:latest'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
-
     stages {
         stage('Checkout') {
             agent any
@@ -17,17 +10,25 @@ pipeline {
         }
                 
         stage('Build FastAPI Docker Image') {
-            agent dockerAgent
-            steps {
-                sh 'docker --version'
+            agent {
+                docker {
+                    image 'docker/compose:latest'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {                
                 sh 'docker build -t fastapi-reborn .'
             }
         }
 
         stage('Run Docker Compose') {
-            agent dockerAgent
+            agent {
+                docker {
+                    image 'docker/compose:latest'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
-                sh 'docker-compose --version'
                 dir('infra') {
                     sh 'docker-compose down'
                     sh 'docker-compose up -d --build'
