@@ -76,52 +76,63 @@ Item {
             color: "transparent"
             border.width: 4
             border.color: "#55aeeeff"
-            transform: Rotation { id: outerRot; origin.x: width/2; origin.y: height/2; angle: 0 }
-        }
-        NumberAnimation {
-            target: outerRot
-            property: "angle"
-            from: 0; to: 360
-            duration: 1500
-            loops: Animation.Infinite
-            easing.type: Easing.Linear
+
+            RotationAnimator on rotation {
+                from: 0
+                to: 360
+                duration: 1500
+                loops: Animation.Infinite
+                running: true
+            }
         }
 
         // 안쪽 고리(Canvas)
-        Canvas {
-            id: innerRing
+        Item {
+            id: innerRingWrapper
             anchors.centerIn: parent
             width: parent.width - 12
             height: parent.height - 12
-            transform: Rotation { id: innerRot; origin.x: width/2; origin.y: height/2; angle: 0 }
 
-            onPaint: {
-                const ctx = getContext("2d")
-                const w = width; const h = height
-                const r = Math.min(w, h)/2 - 2
-                ctx.reset()
-                ctx.translate(w/2, h/2)
-                ctx.lineWidth = 4
-                ctx.lineCap = "round"
+            Canvas {
+                id: innerRing
+                anchors.fill: parent
 
-                ctx.beginPath()
-                ctx.strokeStyle = "#22d3ee" // cyan
-                ctx.arc(0, 0, r, -Math.PI/2, 0) // 12→3시
-                ctx.stroke()
+                onPaint: {
+                    const ctx = getContext("2d")
+                    const w = width; const h = height
+                    const r = Math.min(w, h)/2 - 2
+                    ctx.reset()
+                    ctx.translate(w/2, h/2)
+                    ctx.lineWidth = 4
+                    ctx.lineCap = "round"
 
-                ctx.beginPath()
-                ctx.strokeStyle = "#60a5fa" // blue
-                ctx.arc(0, 0, r, 0, Math.PI/4) // 3시→약 45°
-                ctx.stroke()
+                    ctx.beginPath()
+                    ctx.strokeStyle = "#22d3ee" // cyan
+                    ctx.arc(0, 0, r, -Math.PI/2, 0) // 12→3시
+                    ctx.stroke()
+
+                    ctx.beginPath()
+                    ctx.strokeStyle = "#60a5fa" // blue
+                    ctx.arc(0, 0, r, 0, Math.PI/4) // 3시→약 45°
+                    ctx.stroke()
+                }
             }
-        }
-        NumberAnimation {
-            target: innerRot
-            property: "angle"
-            from: 0; to: 360
-            duration: 1500
-            loops: Animation.Infinite
-            easing.type: Easing.Linear
+
+            // innerRing에 드롭섀도
+            MultiEffect {
+                anchors.fill: innerRing
+                source: innerRing
+                shadowEnabled: true
+                shadowOpacity: 0.35
+            }
+
+            RotationAnimator on rotation {
+                from: 0
+                to: 360
+                duration: 1500
+                loops: Animation.Infinite
+                running: true
+            }
         }
 
         // 중앙 글로우 점
@@ -153,14 +164,6 @@ Item {
             shadowEnabled: true
             shadowOpacity: 0.7
             shadowBlur: 0.9
-        }
-
-        // innerRing에 드롭섀도
-        MultiEffect {
-            anchors.fill: innerRing
-            source: innerRing
-            shadowEnabled: true
-            shadowOpacity: 0.35
         }
     }
 
