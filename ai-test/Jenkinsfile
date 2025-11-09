@@ -10,16 +10,18 @@ pipeline {
                 
         stage('Build FastAPI Docker Image') {
             steps {
-                sh 'docker build -t fastapi-reborn .'
+                dir('ai-test') {
+                    sh 'docker build -t fastapi-reborn .'
+                }
             }
         }
 
         stage('Run Docker Compose') {
             steps {
-                dir('infra') {
-                    sh 'docker-compose down'
+                dir('ai-test/infra') {
+                    sh 'docker compose down'
                     
-                    sh 'docker-compose up -d --build'
+                    sh 'docker compose up -d --build'
                 }
             }
         }
