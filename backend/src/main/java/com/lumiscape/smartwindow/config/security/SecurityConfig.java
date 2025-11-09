@@ -18,10 +18,11 @@ import java.util.List;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final OAuth2SuccessHandler oAuth2SuccessHandler; // 1. 이 필드를 다시 추가
     
     // TODO: 앞으로 만들 OAuth2 관련 서비스들을 주입받을 예정입니다.
     // private final CustomOAuth2UserService customOAuth2UserService;
-    // private final OAuth2SuccessHandler oAuth2SuccessHandler;
     // private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
@@ -40,16 +41,15 @@ public class SecurityConfig {
 
                 // 4. 요청 경로별 접근 권한 설정
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 이 주소들은 모두 허용
-                        .anyRequest().authenticated() // 나머지 모든 요청은 인증 필요
+                        // 2. "/auth/success" 경로를 permitAll에 추가
+                        .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**", "/auth/success").permitAll() 
+                        .anyRequest().authenticated()
                 )
 
                 // 5. OAuth2 로그인 설정
-                .oauth2Login(oauth2 -> {
-                        // TODO: 로그인 성공/실패 핸들러, 사용자 정보 서비스 연결
-                        // .userInfoEndpoint(user -> user.userService(customOAuth2UserService))
-                        // .successHandler(oAuth2SuccessHandler)
-                })
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2SuccessHandler) // 3. successHandler를 등록
+                )
                 
                 // 6. JWT 필터 추가
                 // TODO: 우리가 만든 JWT 필터를 Spring Security 필터 체인에 추가

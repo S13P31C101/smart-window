@@ -1,14 +1,18 @@
-package com.lumiscape.smartwindow.user.domain;
+package com.lumiscape.smartwindow.user.domain.entity;
 
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.mobile.domain.Mobile;
+
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -18,6 +22,7 @@ import java.util.List;
 @Getter
 @Table(name = "users")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class User {
 
     @Id
@@ -38,6 +43,7 @@ public class User {
     private OffsetDateTime lastLoginAt;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, columnDefinition = "user_status_enum")
     private UserStatus status;
 
@@ -56,9 +62,10 @@ public class User {
 
 
     @Builder
-    public User(String email, String nickname) {
+    public User(String email, String nickname, UserStatus status) {
         this.email = email;
         this.nickname = nickname;
+        this.status = status;
     }
 
     public User updateNickname(String nickname) {
@@ -70,6 +77,12 @@ public class User {
     public User updateLastLogin() {
         this.lastLoginAt = OffsetDateTime.now();
 
+        return this;
+    }
+
+    public User withdraw() {
+        this.status = UserStatus.DELETED;
+        
         return this;
     }
 }

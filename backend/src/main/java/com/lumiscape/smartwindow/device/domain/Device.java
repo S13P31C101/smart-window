@@ -2,7 +2,8 @@ package com.lumiscape.smartwindow.device.domain;
 
 import com.lumiscape.smartwindow.alarm.domain.Alarm;
 import com.lumiscape.smartwindow.media.domain.Media;
-import com.lumiscape.smartwindow.user.domain.User;
+import com.lumiscape.smartwindow.user.domain.entity.User;
+
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
