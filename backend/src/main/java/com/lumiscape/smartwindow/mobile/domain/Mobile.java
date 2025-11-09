@@ -1,12 +1,13 @@
 package com.lumiscape.smartwindow.mobile.domain;
 
-import com.lumiscape.smartwindow.user.domain.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.UpdateTimestamp;
+
+import com.lumiscape.smartwindow.user.domain.entity.User;
 
 import java.time.OffsetDateTime;
 

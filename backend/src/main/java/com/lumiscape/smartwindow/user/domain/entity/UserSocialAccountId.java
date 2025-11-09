@@ -1,27 +1,27 @@
-package com.lumiscape.smartwindow.user.domain;
+package com.lumiscape.smartwindow.user.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.io.Serializable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Embeddable
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @EqualsAndHashCode
 public class UserSocialAccountId implements Serializable {
 
-    @Column(name = "social_id", length = 255)
+    @Column(name = "social_id", nullable = false)
     private String socialId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "provider", columnDefinition = "social_provider_enum")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, columnDefinition = "social_provider_enum")
     private SocialProvider provider;
 }

@@ -12,8 +12,9 @@ import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.repository.MediaRepository;
-import com.lumiscape.smartwindow.user.domain.User;
-import com.lumiscape.smartwindow.user.repository.UserRepository;
+import com.lumiscape.smartwindow.user.domain.entity.User;
+import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

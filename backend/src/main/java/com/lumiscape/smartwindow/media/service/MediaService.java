@@ -10,8 +10,9 @@ import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.dto.*;
 import com.lumiscape.smartwindow.media.repository.MediaRepository;
-import com.lumiscape.smartwindow.user.domain.User;
-import com.lumiscape.smartwindow.user.repository.UserRepository;
+import com.lumiscape.smartwindow.user.domain.entity.User;
+import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;

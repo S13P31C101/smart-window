@@ -1,4 +1,4 @@
-package com.lumiscape.smartwindow.user.domain;
+package com.lumiscape.smartwindow.user.domain.entity;
 
 public enum SocialProvider {
     GOOGLE,
