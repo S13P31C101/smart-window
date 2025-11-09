@@ -173,6 +173,8 @@ public class MediaService {
 
         AIRequest aiRequest = new AIRequest(originMedia.getId(), presignedDownloadUrl, targetAiS3Key);
 
+        log.info("mediaId : {}, \ndownloadUrl : {},\ntargetAIS3Key : {}", originMedia.getId(), presignedDownloadUrl, targetAiS3Key);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 

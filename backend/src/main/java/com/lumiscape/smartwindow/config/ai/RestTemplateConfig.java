@@ -1,4 +1,4 @@
-package com.lumiscape.smartwindow.config;
+package com.lumiscape.smartwindow.config.ai;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
