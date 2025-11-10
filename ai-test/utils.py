@@ -118,7 +118,6 @@ yolo_model = YOLO('yolov8n.pt')
 seg_model_id = "nvidia/segformer-b3-finetuned-cityscapes-1024-1024"
 seg_model = SegformerForSemanticSegmentation.from_pretrained(seg_model_id)
 seg_processor = SegformerImageProcessor.from_pretrained(seg_model_id)
-
 def expand_box(box, image_shape, scale=0.1):
     x1, y1, x2, y2 = box
     h, w = image_shape[:2]
@@ -128,6 +127,12 @@ def expand_box(box, image_shape, scale=0.1):
     x2_new = min(int(x2 + w_box * scale), w - 1)
     y2_new = min(int(y2 + h_box * scale), h - 1)
     return x1_new, y1_new, x2_new, y2_new
+
+device_type = "cuda" if torch.cuda.is_available() else "cpu"
+pipe_inpaint = StableDiffusionInpaintPipeline.from_pretrained(
+    "stabilityai/stable-diffusion-2-inpainting",
+    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
+).to(device_type)
 
 def inpaint_image(image_np, mask_np):
     input_height, input_width = image_np.shape[:2]
@@ -145,6 +150,72 @@ def inpaint_image(image_np, mask_np):
     ).images[0]
     result = result.resize((input_width, input_height), Image.LANCZOS)
     return result
+
+async def ai_image_pipeline(
+    media_id: int,
+    download_url: str,
+    target_ai_s3_key: str,
+    file_type: str,
+    process_fn: callable,
+    process_args: dict,
+    upload_url_api: str = "https://k13c101.p.ssafy.io/api/v1/media/ai-upload-url",
+    callback_api: str = "https://k13c101.p.ssafy.io/api/v1/meida/ai-callback"
+):
+    async with httpx.AsyncClient() as client:
+        # 1. 원본 이미지 다운로드
+        resp = await client.get(download_url)
+        if resp.status_code != 200:
+            raise Exception(f"Failed to download image (status: {resp.status_code})")
+        original_bytes = resp.content
+        if not original_bytes or len(original_bytes) < 128:
+            raise Exception("Downloaded image file is empty or too small. Is presigned URL expired?")
+
+        # 2. 이미지 가공
+        processed_img = await process_fn(original_bytes, **process_args)
+        img_buf = io.BytesIO()
+        processed_img.save(img_buf, format="PNG")
+        img_buf.seek(0)
+
+        # 3. BE에 업로드 경로 요청 (헤더에 토큰 없음)
+        s3_req = { "s3ObjectKey": target_ai_s3_key }
+        upload_resp = await client.post(
+            upload_url_api,
+            headers={"Content-Type": "application/json"},  # ← 토큰 제거
+            json=s3_req
+        )
+        if upload_resp.status_code != 200:
+            raise Exception("Failed to request S3 upload URL")
+        upload_data = upload_resp.json()["data"]
+        s3_upload_url = upload_data["fileUrl"]
+
+        # 4. S3(실제 업로드 주소)에 이미지 업로드 (헤더에 토큰 없음)
+        s3_file_resp = await client.post(
+            s3_upload_url,
+            headers={ "Content-Type": "image/png"},  # ← 토큰 제거
+            content=img_buf.getvalue()
+        )
+        if s3_file_resp.status_code not in [200, 201]:
+            raise Exception("Failed to upload image to S3")
+
+        # 5. BE에 Callback 요청 (헤더에 토큰 없음)
+        callback_req = {
+            "parentMediaId": media_id,
+            "s3ObjectKey": target_ai_s3_key,
+            "fileType": file_type
+        }
+        callback_resp = await client.post(
+            callback_api,
+            headers={ "Content-Type": "application/json"},  # ← 토큰 제거
+            json=callback_req
+        )
+        if callback_resp.status_code not in [200, 201]:
+            raise Exception("Callback failed")
+
+    return {
+        "status": "success",
+        "media_id": media_id,
+        "s3ObjectKey": target_ai_s3_key
+    }
 
 def preprocess(img: Image.Image, size=(1024, 1024)):
     img = img.convert("RGB")
