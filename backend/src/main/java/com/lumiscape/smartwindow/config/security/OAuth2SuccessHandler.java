@@ -1,5 +1,8 @@
 package com.lumiscape.smartwindow.config.security;
 
+import com.lumiscape.smartwindow.auth.domain.RefreshToken;
+import com.lumiscape.smartwindow.auth.dto.TokenResponse;
+import com.lumiscape.smartwindow.auth.repository.RefreshTokenRepository;
 import com.lumiscape.smartwindow.config.jwt.JwtTokenProvider;
 import com.lumiscape.smartwindow.user.domain.entity.*;
 import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
@@ -15,6 +18,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
@@ -30,8 +34,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final UserSocialAccountRepository userSocialAccountRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
+    @Transactional
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
         // ↓↓↓ 여기서부터 try 블록 시작 ↓↓↓
         try {
@@ -76,11 +82,20 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             
             Long userId = user.getId();
             Authentication newAuth = new UsernamePasswordAuthenticationToken(userId, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
-            String token = jwtTokenProvider.generateToken(newAuth);
-            
+
+            TokenResponse tokenResponse = jwtTokenProvider.generateTokenResponse(newAuth);
             log.info("로그인 성공: User ID '{}'에 대한 JWT 발급", userId);
 
-            String targetUrl = UriComponentsBuilder.fromUriString("/auth/success").queryParam("token", token).build().toUriString();
+            refreshTokenRepository.findById(userId)
+                    .ifPresentOrElse(
+                            refreshToken -> refreshToken.updateToken(tokenResponse.getRefreshToken()),
+                            () -> refreshTokenRepository.save(new RefreshToken(userId, tokenResponse.getRefreshToken()))
+                    );
+
+            String targetUrl = UriComponentsBuilder.fromUriString("/auth/success")
+                    .queryParam("accessToken", tokenResponse.getAccessToken())
+                    .queryParam("refreshToken", tokenResponse.getRefreshToken())
+                    .build().toUriString();
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
 
         } catch (Exception e) {
