@@ -80,6 +80,7 @@ CREATE TABLE devices (
     power_status BOOLEAN DEFAULT FALSE NOT NULL,
     open_status BOOLEAN DEFAULT FALSE NOT NULL,
     mode_status device_mode_enum DEFAULT 'AUTO_MODE' NOT NULL,
+    mode_settings JSONB NULL,
     media_id BIGINT NULL REFERENCES media(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
