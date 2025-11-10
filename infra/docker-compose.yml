@@ -19,7 +19,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
     env_file:
-      - /home/ubuntu/LumiScape/.env
+      - /srv/LumiScape/.env
     depends_on:
       - postgres
       - mosquitto
@@ -33,7 +33,7 @@ services:
     ports:
       - "5432:5432"
     env_file:
-      - /home/ubuntu/LumiScape/.env
+      - /srv/LumiScape/.env
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
