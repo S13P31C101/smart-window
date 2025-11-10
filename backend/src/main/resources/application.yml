@@ -21,6 +21,12 @@ spring:
 server:
   port: 8080 # 우리 서버가 실행될 포트
 
+# App-specific properties
+app:
+  ai:
+    server-url: ${AI_SERVER_URL:http://localhost:5000} # AI 서버 주소
+    secret: ${AI_CALLBACK_SECRET} # AI 서버 콜백 시크릿
+
 # S3 설정
 cloud:
   aws:
