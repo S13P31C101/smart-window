@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '@/stores/authStore'; // 1. authStore를 import 합니다.
 
 const isDevelopment = __DEV__;
 const DEV_DOMAIN = 'http://localhost:8080';
@@ -19,14 +20,18 @@ const apiClient = axios.create({
 /**
  * [확장 포인트]
  * 요청 인터셉터: 모든 API 요청이 보내지기 전에 공통으로 처리할 로직
- * 예: AsyncStorage에서 토큰을 가져와 헤더에 추가
+ * 예: Zustand 스토어에서 토큰을 가져와 헤더에 추가
  */
 apiClient.interceptors.request.use(
   config => {
-    // const token = getToken();
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    // 2. Zustand 스토어에서 현재 상태를 가져옵니다.
+    const { accessToken } = useAuthStore.getState();
+
+    // 3. 토큰이 있다면 헤더에 추가합니다.
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    
     return config;
   },
   error => {
