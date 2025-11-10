@@ -12,6 +12,7 @@ pipeline {
             steps {
                 dir('backend') {
                     sh 'cp /application-oauth.yml ./src/main/resources/application-oauth.yml'
+
                     sh 'chmod +x ./gradlew' 
                     sh './gradlew build -x test'
                 }
@@ -30,6 +31,8 @@ pipeline {
             steps {
                 dir('infra') {
                     sh 'docker compose down'
+                    
+                    sh 'cp /.env .env'
                     
                     sh 'docker compose up -d --build'
                 }
