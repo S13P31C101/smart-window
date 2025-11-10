@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include "core/RestClient.h"
 
 /**
  * @brief Spotify OAuth authentication helper
@@ -16,7 +17,7 @@ class SpotifyAuthHelper : public QObject
     Q_PROPERTY(bool authenticated READ authenticated NOTIFY authenticationChanged)
 
 public:
-    explicit SpotifyAuthHelper(QObject *parent = nullptr);
+    explicit SpotifyAuthHelper(RestClient *restClient, QObject *parent = nullptr);
     ~SpotifyAuthHelper() = default;
 
     /**
@@ -45,6 +46,16 @@ public:
      */
     Q_INVOKABLE void handleCallback(const QString &code);
 
+    /**
+     * @brief Try to restore authentication from saved tokens
+     */
+    Q_INVOKABLE void restoreAuthentication();
+
+    /**
+     * @brief Refresh access token using refresh token
+     */
+    Q_INVOKABLE void refreshAccessToken();
+
 signals:
     void authUrlChanged();
     void authenticationChanged();
@@ -54,10 +65,15 @@ signals:
 private:
     QString generateCodeVerifier();
     QString generateCodeChallenge(const QString &verifier);
+    void exchangeToken(const QString &code);
+    void saveTokens(const QString &accessToken, const QString &refreshToken, int expiresIn);
+    bool loadTokens(QString &accessToken, QString &refreshToken);
 
+    RestClient *m_restClient{nullptr};
     QString m_authUrl;
     bool m_authenticated{false};
     QString m_codeVerifier;
     QString m_clientId;
     QString m_redirectUri;
+    QString m_refreshToken;
 };

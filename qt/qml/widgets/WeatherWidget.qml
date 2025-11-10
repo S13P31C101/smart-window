@@ -1,180 +1,136 @@
 import QtQuick 2.15
+import QtQuick.Window 2.15
 import QtQuick.Effects
 import "../components"
 import "../styles"
 
-GlassCard {
+Item {
     id: root
 
-    width: 320
-    height: 220
+    width: Window.window ? Window.window.width * 0.74 : 800
+    height: Window.window ? Window.window.height * 0.03125 : 60
 
-    // 날씨별 배경 그라디언트
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        gradient: Gradient {
-            GradientStop {
-                position: 0.0
-                color: Theme.alpha(getWeatherColor(), 0.12)
-            }
-            GradientStop {
-                position: 1.0
-                color: Theme.alpha(getWeatherColor(), 0.05)
+    Row {
+        anchors.centerIn: parent
+        spacing: Window.window ? Window.window.width * 0.0185 : 20
+
+        // 날씨 아이콘
+        Text {
+            text: getWeatherIcon(weatherProvider.condition)
+            font.pixelSize: Window.window ? Window.window.width * 0.044 : 48
+            anchors.verticalCenter: parent.verticalCenter
+
+            // 아이콘 애니메이션
+            SequentialAnimation on scale {
+                loops: Animation.Infinite
+                NumberAnimation { to: 1.1; duration: 2000; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutQuad }
             }
         }
-        opacity: 0.7
-    }
 
-    Column {
-        anchors.fill: parent
-        anchors.margins: Theme.paddingM
-        spacing: Theme.spacingM
+        // 온도
+        Text {
+            text: weatherProvider.temperature
+            font.pixelSize: Window.window ? Window.window.width * 0.037 : 40
+            font.weight: Font.Bold
+            color: Theme.alpha("#ffffff", 1.0)
+            anchors.verticalCenter: parent.verticalCenter
+        }
 
-        // 헤더: 도시명
+        // 구분선
+        Rectangle {
+            width: 2
+            height: Window.window ? Window.window.height * 0.021 : 40
+            color: Theme.alpha("#ffffff", 0.3)
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        // 날씨 상태
+        Text {
+            text: weatherProvider.condition
+            font.pixelSize: Window.window ? Window.window.width * 0.0185 : 20
+            font.weight: Theme.fontWeightMedium
+            color: Theme.alpha("#ffffff", 0.85)
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        // 도시명
         Row {
-            width: parent.width
-            spacing: Theme.spacingS
+            spacing: Window.window ? Window.window.width * 0.0056 : 6
+            anchors.verticalCenter: parent.verticalCenter
 
             Text {
                 text: "📍"
-                font.pixelSize: 18
+                font.pixelSize: Window.window ? Window.window.width * 0.0167 : 18
                 opacity: 0.8
+                anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: weatherProvider.city
-                font.pixelSize: Theme.fontSizeH4
-                font.weight: Theme.fontWeightSemiBold
-                color: Theme.textPrimary
+                font.pixelSize: Window.window ? Window.window.width * 0.0167 : 18
+                font.weight: Theme.fontWeightMedium
+                color: Theme.alpha("#ffffff", 0.75)
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
-        // 메인: 날씨 아이콘 + 온도
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: Theme.spacingL
+        // 구분선
+        Rectangle {
+            width: 2
+            height: Window.window ? Window.window.height * 0.021 : 40
+            color: Theme.alpha("#ffffff", 0.3)
+            anchors.verticalCenter: parent.verticalCenter
+        }
 
-            // 큰 날씨 아이콘
+        // 습도
+        Row {
+            spacing: Window.window ? Window.window.width * 0.0056 : 6
+            anchors.verticalCenter: parent.verticalCenter
+
             Text {
-                text: getWeatherIcon(weatherProvider.condition)
-                font.pixelSize: 72
+                text: "💧"
+                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
                 anchors.verticalCenter: parent.verticalCenter
-
-                // 아이콘 애니메이션
-                SequentialAnimation on scale {
-                    loops: Animation.Infinite
-                    NumberAnimation { to: 1.1; duration: 2000; easing.type: Easing.InOutQuad }
-                    NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutQuad }
-                }
             }
 
-            // 온도
-            Column {
-                spacing: 4
+            Text {
+                text: weatherProvider.humidity + "%"
+                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                font.weight: Theme.fontWeightMedium
+                color: Theme.alpha("#ffffff", 0.75)
                 anchors.verticalCenter: parent.verticalCenter
-
-                Text {
-                    text: weatherProvider.temperature
-                    font.pixelSize: 56
-                    font.weight: Theme.fontWeightLight
-                    color: Theme.textPrimary
-                }
-
-                Text {
-                    text: weatherProvider.condition
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.weight: Theme.fontWeightMedium
-                    color: Theme.textSecondary
-                    opacity: 0.9
-                }
             }
         }
 
-        // 추가 정보: 습도 & 풍속
+        // 풍속
         Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: Theme.spacingXl
+            spacing: Window.window ? Window.window.width * 0.0056 : 6
+            anchors.verticalCenter: parent.verticalCenter
 
-            // 습도
-            Rectangle {
-                width: 90
-                height: 36
-                radius: 18
-                color: Theme.alpha(Theme.accent, 0.12)
-                border.color: Theme.alpha(Theme.accent, 0.2)
-                border.width: 1
-
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Text {
-                        text: "💧"
-                        font.pixelSize: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: weatherProvider.humidity + "%"
-                        font.pixelSize: Theme.fontSizeCaption
-                        font.weight: Theme.fontWeightMedium
-                        color: Theme.textPrimary
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
+            Text {
+                text: "💨"
+                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                anchors.verticalCenter: parent.verticalCenter
             }
 
-            // 풍속
-            Rectangle {
-                width: 90
-                height: 36
-                radius: 18
-                color: Theme.alpha(Theme.primary, 0.12)
-                border.color: Theme.alpha(Theme.primary, 0.2)
-                border.width: 1
-
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Text {
-                        text: "💨"
-                        font.pixelSize: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: weatherProvider.windSpeed.toFixed(1) + " m/s"
-                        font.pixelSize: Theme.fontSizeCaption
-                        font.weight: Theme.fontWeightMedium
-                        color: Theme.textPrimary
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
+            Text {
+                text: weatherProvider.windSpeed.toFixed(1) + " m/s"
+                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                font.weight: Theme.fontWeightMedium
+                color: Theme.alpha("#ffffff", 0.75)
+                anchors.verticalCenter: parent.verticalCenter
             }
-        }
-
-        // 로딩/에러 상태
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: weatherProvider.loading ? "Loading..." : weatherProvider.error
-            font.pixelSize: Theme.fontSizeCaption
-            color: weatherProvider.error !== "" ? Theme.error : Theme.textTertiary
-            visible: weatherProvider.loading || weatherProvider.error !== ""
-            opacity: 0.8
         }
     }
 
-    // 날씨별 색상 반환
-    function getWeatherColor() {
-        const condition = weatherProvider.condition.toLowerCase()
-        if (condition.includes("clear")) return "#FFA500"  // 오렌지 (맑음)
-        if (condition.includes("cloud")) return "#87CEEB"  // 하늘색 (구름)
-        if (condition.includes("rain")) return "#4169E1"   // 파랑 (비)
-        if (condition.includes("snow")) return "#ADD8E6"   // 연한 파랑 (눈)
-        if (condition.includes("thunder")) return "#8B00FF" // 보라 (천둥)
-        return Theme.primary
+    // 로딩/에러 상태
+    Text {
+        anchors.centerIn: parent
+        text: weatherProvider.loading ? "Loading weather..." : weatherProvider.error
+        font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+        color: weatherProvider.error !== "" ? Theme.error : Theme.alpha("#ffffff", 0.7)
+        visible: weatherProvider.loading || weatherProvider.error !== ""
     }
 
     // 날씨 아이콘

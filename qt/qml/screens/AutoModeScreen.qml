@@ -30,43 +30,35 @@ Item {
         opacity: 0.3
     }
 
-    // Recommended content
+    // ====== 중앙 상단 위젯 영역 ======
     Column {
-        anchors.centerIn: parent
-        spacing: Theme.spacingXl
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: parent.height * 0.12
+        spacing: 20
 
-        Text {
+        // 시계 위젯
+        ClockWidget {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "✨"
-            font.pixelSize: 80
         }
 
-        Text {
+        // 날씨 위젯
+        WeatherWidget {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Good " + currentPeriod
-            font.pixelSize: Theme.fontSizeH2
-            font.weight: Theme.fontWeightBold
-            color: Theme.textPrimary
         }
 
-        Text {
+        // 명언 위젯 (날씨 바로 밑)
+        QuoteWidget {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Auto-recommended based on time and weather"
-            font.pixelSize: Theme.fontSizeBody
-            color: Theme.textSecondary
         }
+    }
 
-        // Widgets grid
-        Grid {
-            anchors.horizontalCenter: parent.horizontalCenter
-            columns: 2
-            spacing: Theme.spacingL
-
-            ClockWidget {}
-            WeatherWidget {}
-            SpotifyWidget { visible: spotifyProvider.authenticated }
-            QuoteWidget {}
-        }
+    // ====== 하단 위젯 영역 (Spotify 중앙) ======
+    SpotifyWidget {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: parent.height * 0.08
+        visible: spotifyProvider.authenticated
     }
 
     // Back button
