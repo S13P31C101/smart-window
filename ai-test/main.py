@@ -1,90 +1,60 @@
-from fastapi import FastAPI, File, UploadFile, Form, Header,Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
-from dotenv import load_dotenv
-import os
 import io
-import utils
-    
+import utils  # 위의 utils.py에 모든 부속 함수 포함되어 있다고 가정
+
+import os
+from dotenv import load_dotenv
+
 load_dotenv()
 app = FastAPI()
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-
-from fastapi import APIRouter, File, UploadFile, Form
-from fastapi.responses import StreamingResponse, JSONResponse
-import io
-import numpy as np
-import cv2
-from PIL import Image
-from ultralytics import YOLO
-import utils
-
-gms_router = APIRouter(prefix="/gms")
-yolo_model = YOLO('yolov8n.pt')
-
-from fastapi import APIRouter, Form
-from fastapi.responses import StreamingResponse, JSONResponse
-import io
-import utils
-
-gms_router = APIRouter(prefix="/gms")
-
-@gms_router.post("/generate-image/gemizni2", summary="GMS Gemini 2.0 Flash로 이미지 생성")
-async def generate_image_gemini2(
-    prompt: str = Form("Hi, can you create a 3d rendered image of a pig with wings and a top hat flying over a happy futuristic scifi city with lots of greenery?")
-):
+@app.post("/api/v1/media/remove-person/")
+async def remove_person_and_upload(request: dict):
+    media_id = request.get("mediaId")
+    download_url = request.get("downloadUrl")
+    target_s3_key = request.get("targetAIS3Key")
+    if not media_id or not download_url or not target_s3_key:
+        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, and targetAIS3Key are required")
     try:
-        result_img = await utils.gms_gemini2_flash_generate_image(prompt)
+        # 1. 원본 이미지 다운로드
+        image = await utils.download_image(download_url)
+        height, width = image.shape[:2]
+        mask = utils.np.zeros((height, width), utils.np.uint8)
+        # 2. YOLO로 사람 탐지 후 마스크 생성
+        results = utils.yolo_model.predict(image)
+        for r in results:
+            for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
+                if int(cls) == 0:
+                    box_expanded = utils.expand_box(box, image.shape, scale=0.1)
+                    x1, y1, x2, y2 = map(int, box_expanded)
+                    mask[y1:y2, x1:x2] = 255
+        # 3. 인페인팅
+        inpainted_image = utils.inpaint_image(image, mask)
+        # 4. 메모리 버퍼에 PNG 저장
+        buffer = io.BytesIO()
+        inpainted_image.save(buffer, format="PNG")
+        buffer.seek(0)
+        # 5. BE에 AI 업로드 URL 요청
+        ai_upload_data = await utils.request_ai_upload_url(target_s3_key)
+        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
+            raise HTTPException(status_code=500, detail="S3 object key mismatch or missing in AI upload URL response")
+        file_url = ai_upload_data.get("fileUrl")
+        if not file_url:
+            raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
+        # 6. S3에 이미지 업로드
+        await utils.upload_to_s3(file_url, buffer)
+        # 7. AI 콜백 전송
+        await utils.notify_ai_callback(media_id, target_s3_key)
+        return JSONResponse(content={"success": True, "message": "Person removed and uploaded successfully"})
+    except HTTPException as he:
+        return JSONResponse(content={"success": False, "error": he.detail}, status_code=he.status_code)
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-    buf = io.BytesIO()
-    result_img.save(buf, format="PNG")
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="image/png")
-
-app.include_router(gms_router)
-
-@app.post("/api/v1/media/ai-request")
-async def ai_request(
-    mediaId: int = Form(...),
-    downloadUrl: str = Form(...),
-    targetAIS3Key: str = Form(...),
-):
-    try:
-        async def remove_person_pipeline(original_bytes, **_):
-            image_np = np.frombuffer(original_bytes, np.uint8)
-            if image_np.size == 0:
-                raise Exception("Downloaded image file is empty or invalid")
-            image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
-            if image is None:
-                raise Exception("Invalid image format or corrupted")
-            height, width = image.shape[:2]
-            mask = np.zeros((height, width), np.uint8)
-            results = utils.yolo_model.predict(image)
-            for r in results:
-                for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
-                    if int(cls) == 0:  # person class
-                        box_expanded = utils.expand_box(box, image.shape, scale=0.1)
-                        x1, y1, x2, y2 = map(int, box_expanded)
-                        mask[y1:y2, x1:x2] = 255
-            out = utils.inpaint_image(image, mask)
-            return out
-
-        # ai_token 대신 빈 문자열 & 헤더 없이 파이프라인 수행
-        result = await utils.ai_image_pipeline(
-            media_id=mediaId,
-            download_url=downloadUrl,
-            target_ai_s3_key=targetAIS3Key,
-            file_type="IMAGE",
-            process_fn=remove_person_pipeline,
-            process_args={},
-        )
-        return result
-
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        tb = utils.traceback.format_exc()
+        print(tb)
+        return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
 
 @app.post("/upload-image/")
 async def upload_image(file: UploadFile = File(...)):
@@ -94,18 +64,11 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.post("/recommend-music/")
 async def recommend_music(mood_caption: str = Form(...)):
-    """
-    캡션(분위기 문장)을 받고 YouTube Data API로 음악 영상 검색 후 재생 URL 반환
-    """
-    result = await utils.search_youtube_music(mood_caption +" piano music")
+    result = await utils.search_youtube_music(mood_caption + " piano music")
     if result:
         return {"message": f"Found song '{result['title']}'", "youtube_url": result["url"]}
     else:
         return {"message": "No matching music found."}
-
-
-
-
 
 @app.post("/remove-person/")
 async def remove_person(file: UploadFile = File(...)):
@@ -129,23 +92,75 @@ async def remove_person(file: UploadFile = File(...)):
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
 
-@app.post("/sunset-blend/")
-async def sunset_blend(
+@app.post("/scene-blend/")
+async def scene_blend(
     original_file: UploadFile = File(...),
-    sunset_file: UploadFile = File(...),
-    alpha: float = 0.7,
-    prompt: str = "sunset view, warm golden hour, glowing sky, tranquil and peaceful"
+    scene_type: str = Form(...),  # dawn, sunset, night, afternoon 중 하나
+    alpha: float = Form(0.7)
 ):
+    scene_type = scene_type.lower().strip()
     try:
-        print("hello")
         orig_bytes = await original_file.read()
-        sunset_bytes = await sunset_file.read()
-        if len(orig_bytes) == 0 or len(sunset_bytes) == 0:
-            return JSONResponse(content={"success": False, "error": "Empty file uploaded"}, status_code=400)
-        inpaint_result = utils.sunset_blend_pipeline(orig_bytes, sunset_bytes, alpha=alpha, prompt=prompt)
+        blend_file_path, prompt = utils.get_scene_assets(scene_type)
+        inpaint_result = utils.sunset_blend_pipeline(
+            orig_bytes,
+            blend_file_path,
+            alpha=alpha,
+            prompt=prompt
+        )
         buf = io.BytesIO()
         inpaint_result.save(buf, format="PNG")
         buf.seek(0)
         return StreamingResponse(buf, media_type="image/png")
     except Exception as e:
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+    
+
+
+
+@app.post("/api/v1/media/removehuman-scene/")
+async def removehuman_scene_and_upload(request: dict):
+    media_id = request.get("mediaId")
+    download_url = request.get("downloadUrl")
+    target_s3_key = request.get("targetAIS3Key")
+    scene_type = request.get("sceneType", "night").lower().strip()  # 기본값 night
+    if not media_id or not download_url or not target_s3_key:
+        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, sceneType, and targetAIS3Key are required")
+    try:
+        # 1. 원본 이미지 다운로드
+        image = await utils.download_image(download_url)
+        height, width = image.shape[:2]
+        mask = utils.np.zeros((height, width), utils.np.uint8)
+        # 2. YOLO로 사람 탐지 후 마스크 생성
+        results = utils.yolo_model.predict(image)
+        for r in results:
+            for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
+                if int(cls) == 0:
+                    box_expanded = utils.expand_box(box, image.shape, scale=0.1)
+                    x1, y1, x2, y2 = map(int, box_expanded)
+                    mask[y1:y2, x1:x2] = 255
+        # 3. 마스크 영역을 해당 scene prompt로 인페인팅
+        prompt = utils.get_scene_prompt(scene_type)
+        inpainted_image = utils.inpaint_image_with_prompt(image, mask, prompt)
+        # 4. 메모리 버퍼에 PNG 저장
+        buffer = io.BytesIO()
+        inpainted_image.save(buffer, format="PNG")
+        buffer.seek(0)
+        # 5. BE에 AI 업로드 URL 요청
+        ai_upload_data = await utils.request_ai_upload_url(target_s3_key)
+        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
+            raise HTTPException(status_code=500, detail="S3 object key mismatch or missing in AI upload URL response")
+        file_url = ai_upload_data.get("fileUrl")
+        if not file_url:
+            raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
+        # 6. S3에 이미지 업로드
+        await utils.upload_to_s3(file_url, buffer)
+        # 7. AI 콜백 전송
+        await utils.notify_ai_callback(media_id, target_s3_key)
+        return JSONResponse(content={"success": True, "message": f"Person removed and {scene_type} scene blending uploaded successfully"})
+    except HTTPException as he:
+        return JSONResponse(content={"success": False, "error": he.detail}, status_code=he.status_code)
+    except Exception as e:
+        tb = utils.traceback.format_exc()
+        print(tb)
+        return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)

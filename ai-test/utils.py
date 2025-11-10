@@ -1,23 +1,52 @@
 import os
+import io
+import base64
 import numpy as np
 import cv2
 import torch
+import httpx
 from PIL import Image
+import traceback
+from fastapi import FastAPI, HTTPException
+
+from dotenv import load_dotenv
 from ultralytics import YOLO
 from diffusers import StableDiffusionInpaintPipeline
-from transformers import BlipProcessor, BlipForConditionalGeneration, SegformerForSemanticSegmentation, SegformerImageProcessor
-import io
-import httpx
-from dotenv import load_dotenv
-import base64
+from transformers import (
+    BlipProcessor, BlipForConditionalGeneration,
+    SegformerForSemanticSegmentation, SegformerImageProcessor
+)
 
-
-
+# 환경 및 모델 로드
 load_dotenv()
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+GMS_API_KEY = os.getenv("GMS_API_KEY")
+AI_TOKEN = os.getenv("AI_TOKEN")
+AI_UPLOAD_URL = os.getenv("AI_UPLOAD_URL", "http://k13c101.p.ssafy.io/api/v1/media/ai-upload-url")
+AI_CALLBACK_URL = os.getenv("AI_CALLBACK_URL", "http://k13c101.p.ssafy.io/api/v1/media/ai-callback")
 
-# BLIP 이미지 캡셔닝 모델
+device_type = "cuda" if torch.cuda.is_available() else "cpu"
+
+# 모델 미리 로드
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
 caption_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+yolo_model = YOLO('yolov8n.pt')
+seg_model_id = "nvidia/segformer-b3-finetuned-cityscapes-1024-1024"
+seg_model = SegformerForSemanticSegmentation.from_pretrained(seg_model_id)
+seg_processor = SegformerImageProcessor.from_pretrained(seg_model_id)
+
+pipe = StableDiffusionInpaintPipeline.from_pretrained(
+    "stabilityai/stable-diffusion-2-inpainting",
+    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
+).to(device_type)
+
+pipe_sunset = StableDiffusionInpaintPipeline.from_pretrained(
+    "runwayml/stable-diffusion-inpainting",
+    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32,
+    safety_checker=None,
+).to(device_type)
+
+# --- 유틸리티 함수들 ---
 
 def extract_mood_caption(image_bytes: bytes) -> str:
     image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
@@ -26,67 +55,13 @@ def extract_mood_caption(image_bytes: bytes) -> str:
     caption = processor.decode(output[0], skip_special_tokens=True)
     return caption
 
-# YouTube 추천 (API 키는 .env에서)
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
-
-import os
-import base64
-import io
-import httpx
-from PIL import Image
-
-GMS_API_KEY = os.getenv("GMS_API_KEY")
-
-def resize_pil(img, size=(512, 512)):
-    return img.resize(size, Image.LANCZOS)
-
-import os
-import httpx
-import io
-from PIL import Image
-import base64
-
-GMS_API_KEY = os.getenv("GMS_API_KEY")
-
-async def gms_gemini2_flash_generate_image(prompt: str):
-    url = f"https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key={GMS_API_KEY}"
-    headers = {
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "contents": [
-            {
-                "parts": [{"text": prompt}]
-            }
-        ],
-        "generationConfig": {
-            "responseModalities": ["Text", "Image"]
-        }
-    }
-    async with httpx.AsyncClient() as client:
-        r = await client.post(url, headers=headers, json=payload)
-        print("응답코드:", r.status_code)
-        print("응답컨텐츠:", r.text[:500])
-        data = r.json()
-
-    # 이미지 반환 (Gemini의 응답 구조에 따라 맞춤 파싱 필요)
-    try:
-        # 기본 응답 예시 기준(실제 구조와 다르면 수정 필요)
-        image_b64 = data["candidates"][0]["content"]["parts"][1]["inlineData"]["data"]
-    except Exception as e:
-        raise RuntimeError(f"Gemini 응답 파싱 오류: {e}\n전체: {data}")
-
-    result_img = Image.open(io.BytesIO(base64.b64decode(image_b64)))
-    return result_img
-
-
 async def search_youtube_music(query: str):
+    YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
     params = {
         "part": "snippet",
         "q": query,
         "type": "video",
-        "videoCategoryId": "10",  # 음악 카테고리
+        "videoCategoryId": "10",
         "maxResults": 1,
         "key": YOUTUBE_API_KEY
     }
@@ -101,121 +76,92 @@ async def search_youtube_music(query: str):
     else:
         return None
 
-# --- Stable Diffusion inpainting 등 기존 코드 계속 아래...
-device_type = "cuda" if torch.cuda.is_available() else "cpu"
-pipe_inpaint = StableDiffusionInpaintPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-2-inpainting",
-    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
-).to(device_type)
-
-pipe_sunset = StableDiffusionInpaintPipeline.from_pretrained(
-    "runwayml/stable-diffusion-inpainting",
-    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32,
-    safety_checker=None,
-).to(device_type)
-
-yolo_model = YOLO('yolov8n.pt')
-seg_model_id = "nvidia/segformer-b3-finetuned-cityscapes-1024-1024"
-seg_model = SegformerForSemanticSegmentation.from_pretrained(seg_model_id)
-seg_processor = SegformerImageProcessor.from_pretrained(seg_model_id)
 def expand_box(box, image_shape, scale=0.1):
     x1, y1, x2, y2 = box
-    h, w = image_shape[:2]
-    w_box, h_box = x2 - x1, y2 - y1
-    x1_new = max(int(x1 - w_box * scale), 0)
-    y1_new = max(int(y1 - h_box * scale), 0)
-    x2_new = min(int(x2 + w_box * scale), w - 1)
-    y2_new = min(int(y2 + h_box * scale), h - 1)
+    w = x2 - x1
+    h = y2 - y1
+
+    x1_new = max(int(x1 - w * scale), 0)
+    y1_new = max(int(y1 - h * scale), 0)
+    x2_new = min(int(x2 + w * scale), image_shape[1] - 1)
+    y2_new = min(int(y2 + h * scale), image_shape[0] - 1)
+
     return x1_new, y1_new, x2_new, y2_new
 
-device_type = "cuda" if torch.cuda.is_available() else "cpu"
-pipe_inpaint = StableDiffusionInpaintPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-2-inpainting",
-    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
-).to(device_type)
-
 def inpaint_image(image_np, mask_np):
-    input_height, input_width = image_np.shape[:2]
-    image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
-    mask_pil = Image.fromarray(mask_np).convert("L")
-    target_size = (384, 384)
-    image_resized = image_pil.resize(target_size, Image.LANCZOS)
-    mask_resized = mask_pil.resize(target_size, Image.NEAREST)
-    result = pipe_inpaint(
-        prompt="natural outdoor landscape, seamless realistic background",
-        image=image_resized,
-        mask_image=mask_resized,
-        guidance_scale=7.5,
-        num_inference_steps=50
-    ).images[0]
-    result = result.resize((input_width, input_height), Image.LANCZOS)
-    return result
+    try:
+        input_height, input_width = image_np.shape[:2]
+        image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
+        mask_pil = Image.fromarray(mask_np).convert("L")
+        image_pil_resized = image_pil.resize((512, 512), Image.LANCZOS)
+        mask_pil_resized = mask_pil.resize((512, 512), Image.NEAREST)
+        print("Starting inpainting...")
 
-async def ai_image_pipeline(
-    media_id: int,
-    download_url: str,
-    target_ai_s3_key: str,
-    file_type: str,
-    process_fn: callable,
-    process_args: dict,
-    upload_url_api: str = "https://k13c101.p.ssafy.io/api/v1/media/ai-upload-url",
-    callback_api: str = "https://k13c101.p.ssafy.io/api/v1/meida/ai-callback"
-):
-    async with httpx.AsyncClient() as client:
-        # 1. 원본 이미지 다운로드
-        resp = await client.get(download_url)
+        result = pipe(
+            prompt="natural outdoor landscape, seamless realistic background",
+            image=image_pil_resized,
+            mask_image=mask_pil_resized,
+            guidance_scale=7.5,
+            num_inference_steps=50
+        ).images[0]
+        print("Inpainting done")
+        result = result.resize((input_width, input_height), Image.LANCZOS)
+        return result
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(tb)
+        raise RuntimeError(f"Inpainting pipeline error: {str(e)}\n{tb}")
+
+async def download_image(url: str) -> np.ndarray:
+    timeout = httpx.Timeout(30.0, read=30.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.get(url)
         if resp.status_code != 200:
-            raise Exception(f"Failed to download image (status: {resp.status_code})")
-        original_bytes = resp.content
-        if not original_bytes or len(original_bytes) < 128:
-            raise Exception("Downloaded image file is empty or too small. Is presigned URL expired?")
+            raise HTTPException(status_code=400, detail="Failed to download image from downloadUrl")
+        image_np = np.frombuffer(resp.content, np.uint8)
+        image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+        if image is None:
+            raise HTTPException(status_code=400, detail="Downloaded image is invalid or cannot be decoded")
+    return image
 
-        # 2. 이미지 가공
-        processed_img = await process_fn(original_bytes, **process_args)
-        img_buf = io.BytesIO()
-        processed_img.save(img_buf, format="PNG")
-        img_buf.seek(0)
+async def request_ai_upload_url(target_s3_key: str) -> dict:
+    timeout = httpx.Timeout(30.0, read=30.0)
+    headers = {"X-AI-Token": AI_TOKEN}
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(AI_UPLOAD_URL, json={"s3ObjectKey": target_s3_key}, headers=headers)
+        resp.raise_for_status()
+        response_json = resp.json()
+        if response_json.get("status") == 200 and "data" in response_json:
+            return response_json["data"]
+        else:
+            raise HTTPException(status_code=500, detail="Invalid response structure from AI upload URL")
 
-        # 3. BE에 업로드 경로 요청 (헤더에 토큰 없음)
-        s3_req = { "s3ObjectKey": target_ai_s3_key }
-        upload_resp = await client.post(
-            upload_url_api,
-            headers={"Content-Type": "application/json"},  # ← 토큰 제거
-            json=s3_req
-        )
-        if upload_resp.status_code != 200:
-            raise Exception("Failed to request S3 upload URL")
-        upload_data = upload_resp.json()["data"]
-        s3_upload_url = upload_data["fileUrl"]
+async def upload_to_s3(file_url: str, image_buffer: io.BytesIO):
+    timeout = httpx.Timeout(60.0, read=60.0)
+    headers = {"Content-Type": "image/png"}
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.put(file_url, content=image_buffer.getvalue(), headers=headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=resp.status_code, detail=f"S3 upload failed with status code {resp.status_code}")
 
-        # 4. S3(실제 업로드 주소)에 이미지 업로드 (헤더에 토큰 없음)
-        s3_file_resp = await client.post(
-            s3_upload_url,
-            headers={ "Content-Type": "image/png"},  # ← 토큰 제거
-            content=img_buf.getvalue()
-        )
-        if s3_file_resp.status_code not in [200, 201]:
-            raise Exception("Failed to upload image to S3")
-
-        # 5. BE에 Callback 요청 (헤더에 토큰 없음)
-        callback_req = {
-            "parentMediaId": media_id,
-            "s3ObjectKey": target_ai_s3_key,
-            "fileType": file_type
-        }
-        callback_resp = await client.post(
-            callback_api,
-            headers={ "Content-Type": "application/json"},  # ← 토큰 제거
-            json=callback_req
-        )
-        if callback_resp.status_code not in [200, 201]:
-            raise Exception("Callback failed")
-
-    return {
-        "status": "success",
-        "media_id": media_id,
-        "s3ObjectKey": target_ai_s3_key
+async def notify_ai_callback(media_id: int, target_s3_key: str):
+    timeout = httpx.Timeout(30.0, read=30.0)
+    headers = {"X-AI-Token": AI_TOKEN}
+    callback_payload = {
+        "parentMediaId": str(media_id),
+        "s3ObjectKey": target_s3_key,
+        "fileType": "IMAGE"
     }
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(AI_CALLBACK_URL, json=callback_payload, headers=headers)
+        print(f"AI callback status: {resp.status_code}")
+        print(f"AI callback body: {resp.text}")
+        if resp.status_code not in (200, 201):
+            error_detail = f"status={resp.status_code}, response={resp.text}"
+            print(f"AI callback failed: {error_detail}")
+            raise HTTPException(status_code=resp.status_code, detail=f"AI callback to BE failed: {error_detail}")
+
+# -------- Sunet Blending 관련 --------
 
 def preprocess(img: Image.Image, size=(1024, 1024)):
     img = img.convert("RGB")
@@ -247,8 +193,37 @@ def blend_mask_colors(original_img_np, blended_img_np, sky_mask, alpha=0.3):
     output_img[mask_3c] = (alpha * blended_img_np[mask_3c] + (1 - alpha) * original_img_np[mask_3c]).astype(np.uint8)
     return output_img
 
-def sunset_blend_pipeline(original_bytes, sunset_bytes, alpha=0.7, prompt="dawn view, early morning soft light, misty atmosphere, calm and serene"):
+def get_scene_assets(scene_type: str):
+    """
+    scene_type에 따라 blending 이미지 경로와 프롬프트를 반환
+    """
+    scene_configs = {
+        "dawn": {
+            "file_path": "assets/dawn.jpg",
+            "prompt": "dawn view, early morning soft light, misty atmosphere, calm and serene"
+        },
+        "sunset": {
+            "file_path": "assets/sunset.jpg",
+            "prompt": "sunset view, warm golden hour, glowing sky, tranquil and peaceful"
+        },
+        "night": {
+            "file_path": "assets/night.jpg",
+            "prompt": "night sky, stars, quiet, peaceful and dreamy"
+        },
+        "afternoon": {
+            "file_path": "assets/afternoon.jpg",
+            "prompt": "afternoon view, bright sky, clear clouds, energetic and lively"
+        }
+    }
+    config = scene_configs.get(scene_type)
+    if config is None:
+        raise ValueError(f"scene_type must be one of {list(scene_configs.keys())}")
+    return config["file_path"], config["prompt"]
+
+def sunset_blend_pipeline(original_bytes, sunset_file_path, alpha=0.7, prompt="sunset view, warm golden hour, glowing sky, tranquil and peaceful"):
     pil_img = preprocess(Image.open(io.BytesIO(original_bytes)), size=(1024, 1024))
+    with open(sunset_file_path, "rb") as f:
+        sunset_bytes = f.read()
     sunset_img = Image.open(io.BytesIO(sunset_bytes)).convert("RGB").resize((1024, 1024))
     orig_size = (1024, 1024)
     inputs = seg_processor(images=pil_img, return_tensors="pt")
@@ -256,6 +231,7 @@ def sunset_blend_pipeline(original_bytes, sunset_bytes, alpha=0.7, prompt="dawn 
     with torch.no_grad():
         outputs = seg_model(**inputs)
         mask = torch.argmax(outputs.logits.squeeze(), dim=0).cpu().numpy()
+
     sky_mask = (mask == 10)
     sky_mask_clean = postprocess_mask(sky_mask, orig_size)
     img_np = np.array(pil_img)
@@ -273,3 +249,42 @@ def sunset_blend_pipeline(original_bytes, sunset_bytes, alpha=0.7, prompt="dawn 
         num_inference_steps=50,
     ).images[0]
     return inpaint_result
+
+
+
+
+
+#  ------- scene-blend-s3
+
+
+def get_scene_prompt(scene_type: str) -> str:
+    scene_prompts = {
+        "dawn":      "dawn view, early morning soft light, misty atmosphere, calm and serene",
+        "sunset":    "sunset view, warm golden hour, glowing sky, tranquil and peaceful",
+        "night":     "night sky, stars, quiet, peaceful and dreamy",
+        "afternoon": "afternoon view, bright sky, clear clouds, energetic and lively",
+    }
+    return scene_prompts.get(scene_type, scene_prompts["night"])  # 기본값 night
+
+def inpaint_image_with_prompt(image_np, mask_np, prompt):
+    try:
+        input_height, input_width = image_np.shape[:2]
+        image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
+        mask_pil = Image.fromarray(mask_np).convert("L")
+        image_pil_resized = image_pil.resize((512, 512), Image.LANCZOS)
+        mask_pil_resized = mask_pil.resize((512, 512), Image.NEAREST)
+        print("Starting inpainting...")
+        result = pipe(
+            prompt=prompt,
+            image=image_pil_resized,
+            mask_image=mask_pil_resized,
+            guidance_scale=7.5,
+            num_inference_steps=50
+        ).images[0]
+        print("Inpainting done")
+        result = result.resize((input_width, input_height), Image.LANCZOS)
+        return result
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(tb)
+        raise RuntimeError(f"Inpainting pipeline error: {str(e)}\n{tb}")
