@@ -15,6 +15,7 @@
 #include "widgets/ClockProvider.h"
 #include "widgets/WeatherProvider.h"
 #include "widgets/SpotifyProvider.h"
+#include "integrations/SpotifyAuthHelper.h"
 
 int main(int argc, char *argv[])
 {
@@ -77,6 +78,30 @@ int main(int argc, char *argv[])
     auto clockProvider = new ClockProvider(&app);
     auto weatherProvider = new WeatherProvider(&restClient, &app);
     auto spotifyProvider = new SpotifyProvider(&restClient, &app);
+    auto spotifyAuthHelper = new SpotifyAuthHelper(&restClient, &app);
+
+    // Initialize WeatherProvider with API key and default city
+    weatherProvider->setApiKey(config.weatherApiKey());
+    weatherProvider->setCity("Seoul");
+    qInfo() << "WeatherProvider initialized with API key";
+
+    // Initialize SpotifyAuthHelper with config
+    spotifyAuthHelper->initAuth(
+        config.spotifyClientId(),
+        config.spotifyRedirectUri(),
+        "user-read-playback-state user-modify-playback-state user-read-currently-playing"
+    );
+
+    // Connect SpotifyAuthHelper to SpotifyProvider
+    QObject::connect(spotifyAuthHelper, &SpotifyAuthHelper::accessTokenReceived,
+                     spotifyProvider, [spotifyProvider](const QString &token, int expiresIn) {
+        Q_UNUSED(expiresIn)
+        spotifyProvider->setAccessToken(token);
+        qInfo() << "Spotify access token set";
+    });
+
+    // Try to restore authentication from saved tokens
+    spotifyAuthHelper->restoreAuthentication();
 
     widgetRegistry.registerWidget("clock", clockProvider);
     widgetRegistry.registerWidget("weather", weatherProvider);
@@ -101,6 +126,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("clockProvider", clockProvider);
     engine.rootContext()->setContextProperty("weatherProvider", weatherProvider);
     engine.rootContext()->setContextProperty("spotifyProvider", spotifyProvider);
+    engine.rootContext()->setContextProperty("spotifyAuthHelper", spotifyAuthHelper);
 
     // Error handling
     QObject::connect(

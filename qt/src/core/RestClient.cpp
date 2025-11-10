@@ -202,29 +202,60 @@ void RestClient::processReply(QNetworkReply *reply, ResponseCallback callback)
         timeoutTimer->stop();
         m_callbacks.remove(reply);
 
+        // Get HTTP status code
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        QByteArray responseData = reply->readAll();
+
+        qDebug() << "HTTP Response:" << statusCode << "from" << reply->url().toString();
+
         if (reply->error() != QNetworkReply::NoError) {
             QString error = reply->errorString();
             qWarning() << "Network error:" << error;
-            callback(QVariantMap(), error);
-        } else {
-            QByteArray responseData = reply->readAll();
+            qWarning() << "HTTP Status:" << statusCode;
+            qWarning() << "Response body:" << responseData;
 
-            // Try to parse as JSON
+            // Try to parse error response as JSON
             QJsonParseError parseError;
             QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
 
+            QVariantMap errorResponse;
             if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-                QVariantMap response = doc.object().toVariantMap();
-                callback(response, QString());
-            } else if (parseError.error == QJsonParseError::NoError && doc.isArray()) {
+                errorResponse = doc.object().toVariantMap();
+                errorResponse["_statusCode"] = statusCode;
+            } else {
+                errorResponse["text"] = QString::fromUtf8(responseData);
+                errorResponse["_statusCode"] = statusCode;
+            }
+
+            callback(errorResponse, error);
+        } else {
+            // Success - handle 204 No Content
+            if (statusCode == 204 || responseData.isEmpty()) {
                 QVariantMap response;
-                response["data"] = doc.array().toVariantList();
+                response["_statusCode"] = statusCode;
+                response["success"] = true;
                 callback(response, QString());
             } else {
-                // Not JSON, return raw text
-                QVariantMap response;
-                response["text"] = QString::fromUtf8(responseData);
-                callback(response, QString());
+                // Try to parse as JSON
+                QJsonParseError parseError;
+                QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
+
+                if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
+                    QVariantMap response = doc.object().toVariantMap();
+                    response["_statusCode"] = statusCode;
+                    callback(response, QString());
+                } else if (parseError.error == QJsonParseError::NoError && doc.isArray()) {
+                    QVariantMap response;
+                    response["data"] = doc.array().toVariantList();
+                    response["_statusCode"] = statusCode;
+                    callback(response, QString());
+                } else {
+                    // Not JSON, return raw text
+                    QVariantMap response;
+                    response["text"] = QString::fromUtf8(responseData);
+                    response["_statusCode"] = statusCode;
+                    callback(response, QString());
+                }
             }
         }
 

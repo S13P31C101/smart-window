@@ -58,13 +58,16 @@ void SpotifyProvider::play()
     headers["Authorization"] = "Bearer " + m_accessToken;
 
     m_restClient->put(url, QVariantMap(), headers,
-                      [](const QVariantMap &, const QString &error) {
+                      [](const QVariantMap &response, const QString &error) {
         if (!error.isEmpty()) {
             qWarning() << "Spotify play error:" << error;
+            qWarning() << "Response data:" << response;
+        } else {
+            qDebug() << "Spotify play command sent successfully";
         }
     });
 
-    qDebug() << "Spotify: play";
+    qDebug() << "Spotify: play command initiated";
 }
 
 void SpotifyProvider::pause()

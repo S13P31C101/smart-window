@@ -20,50 +20,39 @@ Item {
         color: Theme.alpha(Theme.glassBackground, 0.05)
     }
 
-    // ====== 상단 위젯 영역 ======
-    Row {
+    // ====== 중앙 상단 위젯 영역 ======
+    Column {
         id: topWidgets
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: root.height * 0.08
-        spacing: root.width * 0.03
+        anchors.topMargin: root.height * 0.12
+        spacing: 20
 
         // 시계 위젯
         ClockWidget {
+            anchors.horizontalCenter: parent.horizontalCenter
             visible: showClock
-            scale: 0.75
-            opacity: 0.95
         }
 
         // 날씨 위젯
         WeatherWidget {
+            anchors.horizontalCenter: parent.horizontalCenter
             visible: showWeather
-            scale: 0.75
-            opacity: 0.95
+        }
+
+        // 명언 위젯 (날씨 바로 밑)
+        QuoteWidget {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: showQuote
         }
     }
 
-    // ====== 하단 위젯 영역 ======
-    Row {
-        id: bottomWidgets
+    // ====== 하단 위젯 영역 (Spotify 중앙) ======
+    SpotifyWidget {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: root.height * 0.08
-        spacing: root.width * 0.03
-
-        // Spotify 위젯
-        SpotifyWidget {
-            visible: showSpotify
-            scale: 0.75
-            opacity: 0.95
-        }
-
-        // 명언 위젯
-        QuoteWidget {
-            visible: showQuote
-            scale: 0.75
-            opacity: 0.95
-        }
+        visible: showSpotify
     }
 
     // ====== 위젯 토글 버튼 (우측 상단) ======
