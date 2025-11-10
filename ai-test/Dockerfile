@@ -3,13 +3,7 @@ FROM python:3.10-slim
 
 # 시스템 패키지 설치 (OpenCV 및 GUI 라이브러리 포함)
 RUN apt-get update && apt-get install -y \
-    libgl1 libsm6 libxrender1 libxext6 \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -y \
-    libgthread-2.0-0 \
-    libglib2.0-0 \
-    libgl1 libsm6 libxrender1 libxext6 \
+    libgl1 libsm6 libxrender1 libxext6 libgthread-2.0-0 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 
