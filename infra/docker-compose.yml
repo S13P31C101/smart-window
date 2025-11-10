@@ -1,0 +1,57 @@
+services:
+  nginx:
+    container_name: nginx-reborn
+    build:
+      context: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/letsencrypt:ro
+    depends_on:
+      - spring-reborn
+    networks:
+      - network-reborn
+
+  spring-reborn:
+    image: spring-reborn:latest
+    container_name: spring-reborn
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - mosquitto
+    networks:
+      - network-reborn
+
+  postgres:
+    container_name: postgres-reborn
+    build:
+      context: ./postgres
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - network-reborn
+
+  mosquitto:
+    container_name: mosquitto-reborn
+    build:
+      context: ./mosquitto
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./certs:/etc/letsencrypt:ro
+    networks:
+      - network-reborn
+
+networks:
+  network-reborn:
+
+volumes:
+  postgres-data:

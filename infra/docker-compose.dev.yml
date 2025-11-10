@@ -1,0 +1,43 @@
+services:
+  spring-reborn:
+    image: spring-reborn:latest
+    container_name: spring-reborn
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - mosquitto
+    networks:
+      - network-reborn
+
+  postgres:
+    container_name: postgres-reborn
+    build:
+      context: ./postgres
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - network-reborn
+
+  mosquitto:
+    container_name: mosquitto-reborn
+    build:
+      context: ./mosquitto-dev
+    ports:
+      - "9001:9001"
+    networks:
+      - network-reborn
+
+networks:
+  network-reborn:
+
+volumes:
+  postgres-data:
