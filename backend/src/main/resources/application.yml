@@ -108,3 +108,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect # DB 종류를 명시
+
+# CORS 설정
+cors:
+  allowed-origins: http://localhost:*,http://127.0.0.1:*,http://192.168.100.146:*
+
+# Firebase Cloud Messaging 설정
+fcm:
+  service-account-key-path: serviceAccountKey.json
