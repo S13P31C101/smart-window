@@ -1,0 +1,110 @@
+# ===============================================
+# 공통 설정 (모든 프로필에 적용)
+# ===============================================
+spring:
+  config:
+    import: optional:file:.env[.properties] # <-- 잠시 주석 처리
+  # 'dev' 프로필을 명시적으로 활성화하고, 'oauth' 프로필을 항상 포함합니다.
+  profiles:
+    default: dev
+    include: oauth
+  application:
+    name: smartwindow
+  jackson:
+    time-zone: Asia/Seoul
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+server:
+  port: 8080 # 우리 서버가 실행될 포트
+
+# App-specific properties
+app:
+  ai:
+    server-url: ${AI_SERVER_URL:http://localhost:5000} # AI 서버 주소
+    secret: ${AI_CALLBACK_SECRET} # AI 서버 콜백 시크릿
+
+# S3 설정
+cloud:
+  aws:
+    region:
+      static: ${S3_REGION}
+    s3:
+      bucket: ${S3_BUCKET}
+    credentials:
+      access-key: ${S3_ACCESS}
+      secret-key: ${S3_SECRET}
+
+# MQTT 설정
+mqtt:
+  server:
+    uri: tcp://${MQTT_HOST}:${MQTT_PORT}
+  client:
+    id: ${MQTT_CLIENT_ID}
+  username: ${MQTT_USER}
+  password: ${MQTT_PASSWORD}
+
+# JWT (JSON Web Token) 설정
+jwt:
+  secret: ${JWT_SECRET} # TODO: 외부 환경변수에서 가져올 JWT 비밀키
+  expiration: 1296000000 # 토큰 만료 시간
+
+# Swagger (API 문서 자동화) 설정
+springdoc:
+  swagger-ui:
+    enabled: true
+    display-request-duration: true
+swagger:
+  server-url: http://localhost:8080
+
+
+# --- 는 프로필을 나누는 구분선입니다. ---
+---
+# ===============================================
+# 'dev' 프로필 (개발 환경)
+# ===============================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+  # profiles:
+
+  # Database & JPA
+  datasource:
+    # 이 부분은 application-oauth.yml에서 덮어쓸 것이므로 그대로 둡니다.
+    url: jdbc:postgresql://localhost:5432/smart_window_db
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update # 개발 시에는 update로 설정하여 엔티티 변경사항을 DB에 자동 반영
+    show-sql: true # 실행되는 SQL 쿼리를 로그로 보여줌
+    properties:
+      hibernate:
+        format_sql: true # SQL 로그를 예쁘게 포맷팅
+        dialect: org.hibernate.dialect.PostgreSQLDialect # DB 종류를 명시
+
+---
+# ===============================================
+# 'prod' 프로필 (운영 환경)
+# ===============================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # Database & JPA
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate # 운영 시에는 validate 또는 none으로 설정하여 DB를 함부로 변경하지 않도록 함
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect # DB 종류를 명시
