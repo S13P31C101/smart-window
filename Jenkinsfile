@@ -34,7 +34,7 @@ pipeline {
                     
                     sh 'cp /.env .env'
                     sh 'mkdir -p ./certs'
-                    sh 'cp -rLT /ssl-certs ./certs'
+                    sh 'sudo cp -rLT /ssl-certs ./certs'
                     
                     sh 'docker compose up -d --build'
                 }
