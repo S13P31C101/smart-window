@@ -33,10 +33,6 @@ pipeline {
                     sh 'docker compose down'
                     
                     sh 'cp /.env .env'
-                    sh 'mkdir -p ./certs'
-                    sh 'sudo cp -rLT /ssl-certs ./certs'
-                    sh 'sudo find ./certs -type d -exec chmod 755 {} \\+'
-                    sh 'sudo find ./certs -type f -exec chmod 644 {} \\+'
                     
                     sh 'docker compose up -d --build'
                 }
