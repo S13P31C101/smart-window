@@ -7,7 +7,7 @@ import torch
 import httpx
 from PIL import Image
 import traceback
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException,Body
 
 from dotenv import load_dotenv
 from ultralytics import YOLO
@@ -22,8 +22,8 @@ load_dotenv()
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 GMS_API_KEY = os.getenv("GMS_API_KEY")
 AI_TOKEN = os.getenv("AI_TOKEN")
-AI_UPLOAD_URL = os.getenv("AI_UPLOAD_URL", "http://k13c101.p.ssafy.io/api/v1/media/ai-upload-url")
-AI_CALLBACK_URL = os.getenv("AI_CALLBACK_URL", "http://k13c101.p.ssafy.io/api/v1/media/ai-callback")
+AI_UPLOAD_URL = os.getenv("AI_UPLOAD_URL")
+AI_CALLBACK_URL = os.getenv("AI_CALLBACK_URL")
 
 device_type = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -288,3 +288,33 @@ def inpaint_image_with_prompt(image_np, mask_np, prompt):
         tb = traceback.format_exc()
         print(tb)
         raise RuntimeError(f"Inpainting pipeline error: {str(e)}\n{tb}")
+
+
+# --- GMS API로 이미지 생성 함수 ---
+
+GMS_KEY = os.getenv("GMS_API_KEY")
+
+async def gms_dalle_generate_image(prompt: str) -> str:
+    url = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/images/generations"
+    headers = {
+        "Authorization": f"Bearer {GMS_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "dall-e-3",
+        "prompt": prompt,
+        "size": "1024x1024"
+    }
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            print("Status:", resp.status_code)
+            print("Body:", resp.text)
+            raise RuntimeError("GMS DALL-E API error")
+        data = resp.json()
+        try:
+            # OpenAI DALL-E 3 응답 구조: {'created': ..., 'data': [{'url': ...}]}
+            img_url = data['data'][0]['url']
+            return img_url
+        except Exception as e:
+            raise RuntimeError(f"이미지 파싱 실패: {e}\n전체 응답: {data}")

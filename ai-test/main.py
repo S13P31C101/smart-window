@@ -1,10 +1,11 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException,Body
 from fastapi.responses import JSONResponse, StreamingResponse
 import io
 import utils  # 위의 utils.py에 모든 부속 함수 포함되어 있다고 가정
-
+import httpx
 import os
 from dotenv import load_dotenv
+from PIL import Image
 
 load_dotenv()
 app = FastAPI()
@@ -46,6 +47,7 @@ async def remove_person_and_upload(request: dict):
             raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
         # 6. S3에 이미지 업로드
         await utils.upload_to_s3(file_url, buffer)
+        print(file_url)
         # 7. AI 콜백 전송
         await utils.notify_ai_callback(media_id, target_s3_key)
         return JSONResponse(content={"success": True, "message": "Person removed and uploaded successfully"})
@@ -63,7 +65,8 @@ async def upload_image(file: UploadFile = File(...)):
     return {"mood_caption": caption}
 
 @app.post("/recommend-music/")
-async def recommend_music(mood_caption: str = Form(...)):
+async def recommend_music(request: dict):
+    mood_caption = request.get("mood_caption")
     result = await utils.search_youtube_music(mood_caption + " piano music")
     if result:
         return {"message": f"Found song '{result['title']}'", "youtube_url": result["url"]}
@@ -155,6 +158,7 @@ async def removehuman_scene_and_upload(request: dict):
             raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
         # 6. S3에 이미지 업로드
         await utils.upload_to_s3(file_url, buffer)
+        print(file_url)
         # 7. AI 콜백 전송
         await utils.notify_ai_callback(media_id, target_s3_key)
         return JSONResponse(content={"success": True, "message": f"Person removed and {scene_type} scene blending uploaded successfully"})
@@ -164,3 +168,32 @@ async def removehuman_scene_and_upload(request: dict):
         tb = utils.traceback.format_exc()
         print(tb)
         return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
+
+@app.post("/generate-dalle-image/")
+async def generate_dalle_image_api(request: dict = Body(...)):
+    prompt = request.get("prompt")
+    if not prompt or not isinstance(prompt, str):
+        raise HTTPException(status_code=400, detail="prompt is required as non-empty text.")
+    try:
+        img_url = await utils.gms_dalle_generate_image(prompt)
+        # -- 이미지 다운로드 (바이너리) --
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.get(img_url)
+            if resp.status_code != 200:
+                raise RuntimeError("이미지 다운로드 실패")
+            img_bytes = resp.content
+        # -- PNG/JPEG로 변환 및 스트림 반환 --
+        buf = io.BytesIO(img_bytes)
+        try:
+            # PIL로 열어서, 다시 PNG로 변환(혹시 원본이 JPEG일 경우)
+            img = Image.open(buf)
+            out_buf = io.BytesIO()
+            img.save(out_buf, format="PNG")
+            out_buf.seek(0)
+            return StreamingResponse(out_buf, media_type="image/png")
+        except Exception:
+            # 그냥 원본 바이너리 반환 (이미 PNG라면 그대로)
+            buf.seek(0)
+            return StreamingResponse(buf, media_type="image/png")
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
