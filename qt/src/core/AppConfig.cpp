@@ -3,6 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
+#include <QCoreApplication>
 
 AppConfig::AppConfig(QObject *parent)
     : QObject(parent)
@@ -102,6 +103,11 @@ void AppConfig::setGestureEnabled(bool enabled)
         m_gestureEnabled = enabled;
         emit gestureEnabledChanged();
     }
+}
+
+QString AppConfig::applicationDirPath() const
+{
+    return QCoreApplication::applicationDirPath();
 }
 
 void AppConfig::loadDefaults()

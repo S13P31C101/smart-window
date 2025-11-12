@@ -14,9 +14,9 @@ Item {
         id: bg
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#0f172a" }
-            GradientStop { position: 0.6; color: "#1e293b" }
-            GradientStop { position: 1.0; color: "#0f172a" }
+            GradientStop { position: 0.0; color: "#cbd5e1" } // slate-300
+            GradientStop { position: 0.5; color: "#e2e8f0" } // slate-200
+            GradientStop { position: 1.0; color: "#cbd5e1" } // slate-300
         }
         opacity: 0.0
         NumberAnimation on opacity { from: 0; to: 1; duration: 800; running: true }
@@ -32,7 +32,7 @@ Item {
         Text {
             id: brand
             text: "Lumiscape"
-            color: "#cfefff"
+            color: "#1e293b"  // slate-800
             font.pixelSize: 120
             font.weight: Font.DemiBold
             opacity: 0.0
@@ -49,12 +49,10 @@ Item {
         MultiEffect {
             anchors.fill: brand
             source: brand
-            blurEnabled: true
-            blur: 0.25
             shadowEnabled: true
-            shadowOpacity: 0.4
+            shadowOpacity: 0.15
             shadowBlur: 0.6
-            brightness: 0.03
+            shadowColor: "#94a3b8"
         }
     }
 
@@ -75,7 +73,7 @@ Item {
             radius: width/2
             color: "transparent"
             border.width: 4
-            border.color: "#55aeeeff"
+            border.color: "#a78bfa"  // purple-400
 
             RotationAnimator on rotation {
                 from: 0
@@ -107,12 +105,12 @@ Item {
                     ctx.lineCap = "round"
 
                     ctx.beginPath()
-                    ctx.strokeStyle = "#22d3ee" // cyan
+                    ctx.strokeStyle = "#3b82f6" // blue-500
                     ctx.arc(0, 0, r, -Math.PI/2, 0) // 12→3시
                     ctx.stroke()
 
                     ctx.beginPath()
-                    ctx.strokeStyle = "#60a5fa" // blue
+                    ctx.strokeStyle = "#60a5fa" // blue-400
                     ctx.arc(0, 0, r, 0, Math.PI/4) // 3시→약 45°
                     ctx.stroke()
                 }
@@ -139,7 +137,7 @@ Item {
         Rectangle {
             id: coreDot
             width: 8; height: 8; radius: 4
-            color: "#22d3ee"
+            color: "#3b82f6"  // blue-500
             anchors.centerIn: parent
             opacity: 0.8
             scale: 1.0
@@ -160,10 +158,10 @@ Item {
             source: coreDot
             blurEnabled: true
             blur: 0.35
-            brightness: 0.08
             shadowEnabled: true
-            shadowOpacity: 0.7
+            shadowOpacity: 0.5
             shadowBlur: 0.9
+            shadowColor: "#1e40af"
         }
     }
 
@@ -171,12 +169,13 @@ Item {
     Text {
         id: bootText
         text: "INITIALIZING"
-        color: "#a5f3fc"
+        color: "#64748b"  // slate-500
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: spinner.bottom
         anchors.topMargin: 48
         font.pixelSize: 18
         font.letterSpacing: 4
+        font.weight: Font.Medium
         opacity: 0.0
 
         SequentialAnimation {
@@ -184,8 +183,8 @@ Item {
             NumberAnimation { target: bootText; property: "opacity"; from: 0; to: 1; duration: 500; easing.type: Easing.OutQuad }
             SequentialAnimation {
                 loops: Animation.Infinite
-                NumberAnimation { target: bootText; property: "opacity"; from: 0.0; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
-                NumberAnimation { target: bootText; property: "opacity"; from: 1.0; to: 0.0; duration: 1000; easing.type: Easing.InOutQuad }
+                NumberAnimation { target: bootText; property: "opacity"; from: 0.4; to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
+                NumberAnimation { target: bootText; property: "opacity"; from: 1.0; to: 0.4; duration: 1000; easing.type: Easing.InOutQuad }
             }
         }
     }

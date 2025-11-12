@@ -25,13 +25,13 @@ Item {
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#0f172a" } // slate-900 (더 밝게)
-            GradientStop { position: 0.6; color: "#1e293b" } // slate-800 (더 밝게)
-            GradientStop { position: 1.0; color: "#0f172a" } // slate-900 (더 밝게)
+            GradientStop { position: 0.0; color: "#cbd5e1" } // slate-300
+            GradientStop { position: 0.5; color: "#e2e8f0" } // slate-200
+            GradientStop { position: 1.0; color: "#cbd5e1" } // slate-300
         }
     }
 
-    // 앰비언트 글로우 1 (반응형)
+    // 앰비언트 글로우 1 (반응형) - 밝은 배경용
     Rectangle {
         id: glowA
         property real glowSize: Math.min(root.width, root.height) * 0.35
@@ -40,8 +40,8 @@ Item {
         anchors.leftMargin: parent.width * 0.25 - width/2
         anchors.top: parent.top
         anchors.topMargin: parent.height * 0.25 - height/2
-        color: "#1acff3"   // cyan-500/10 비슷
-        opacity: 0.12
+        color: "#a78bfa"   // purple-400
+        opacity: 0.15
         layer.enabled: true
         layer.effect: MultiEffect {
             blurEnabled: true
@@ -54,12 +54,12 @@ Item {
         }
         SequentialAnimation on opacity {
             loops: Animation.Infinite
-            NumberAnimation { to: 0.5; duration: 4000; easing.type: Easing.InOutQuad }
-            NumberAnimation { to: 0.12; duration: 4000; easing.type: Easing.InOutQuad }
+            NumberAnimation { to: 0.25; duration: 4000; easing.type: Easing.InOutQuad }
+            NumberAnimation { to: 0.15; duration: 4000; easing.type: Easing.InOutQuad }
         }
     }
 
-    // 앰비언트 글로우 2 (반응형)
+    // 앰비언트 글로우 2 (반응형) - 밝은 배경용
     Rectangle {
         id: glowB
         property real glowSize: Math.min(root.width, root.height) * 0.35
@@ -68,8 +68,8 @@ Item {
         anchors.rightMargin: parent.width * 0.25 - width/2
         anchors.bottom: parent.bottom
         anchors.bottomMargin: parent.height * 0.25 - height/2
-        color: "#3b82f6"   // blue-500/10 비슷
-        opacity: 0.10
+        color: "#7dd3fc"   // sky-300
+        opacity: 0.15
         layer.enabled: true
         layer.effect: MultiEffect {
             blurEnabled: true
@@ -82,8 +82,8 @@ Item {
         }
         SequentialAnimation on opacity {
             loops: Animation.Infinite
-            NumberAnimation { to: 0.45; duration: 5000; easing.type: Easing.InOutQuad }
-            NumberAnimation { to: 0.10; duration: 5000; easing.type: Easing.InOutQuad }
+            NumberAnimation { to: 0.25; duration: 5000; easing.type: Easing.InOutQuad }
+            NumberAnimation { to: 0.15; duration: 5000; easing.type: Easing.InOutQuad }
         }
     }
 
@@ -95,7 +95,7 @@ Item {
         spacing: root.height * 0.004
         Text {
             text: "Choose Your Mode"
-            color: "#e2e8f0"   // slate-200~300
+            color: "#1e293b"   // slate-800
             font.pixelSize: Math.min(root.width, root.height) * 0.059
             font.weight: Font.DemiBold
             horizontalAlignment: Text.AlignHCenter
@@ -110,13 +110,13 @@ Item {
         }
     }
 
-    // ====== 라디얼 메뉴 ======
+    // ====== 그리드 메뉴 ======
     // 모드 정의
     readonly property var modes: [
-        { id: "custom",  label: "Custom",          icon: "🎨", gradientA: "#8b5cf6", gradientB: "#ec4899" }, // purple→pink
-        { id: "glass",   label: "Glass",           icon: "🌫️", gradientA: "#06b6d4", gradientB: "#3b82f6" }, // cyan→blue
-        { id: "privacy", label: "Privacy",         icon: "🔒", gradientA: "#334155", gradientB: "#475569" }, // slate
-        { id: "auto",    label: "Auto Recommend",  icon: "☀️", gradientA: "#f59e0b", gradientB: "#f97316" }  // amber→orange
+        { id: "custom",  label: "Custom Mode",  icon: "🎨", gradientA: "#a78bfa", gradientB: "#7dd3fc", textColor: "#1e293b" }, // purple→blue
+        { id: "auto",    label: "Auto Mode",    icon: "💡", gradientA: "#3b82f6", gradientB: "#60a5fa", textColor: "#1e3a8a" }, // blue-600→blue-400
+        { id: "privacy", label: "Privacy Mode", icon: "🔒", gradientA: "#fcd34d", gradientB: "#fbbf24", textColor: "#78350f" }, // yellow-300→yellow-400
+        { id: "glass",   label: "Glass Mode",   icon: "🌫️", gradientA: "#fb923c", gradientB: "#fbbf24", textColor: "#78350f" }  // orange→yellow
     ]
 
     // 커서 좌표 (정규화 → 픽셀)
@@ -128,124 +128,97 @@ Item {
     // 현재 hover 중인 인덱스 (-1: 없음)
     property int hoveredIndex: -1
 
-    // 버튼 원의 중심과 반경 (반응형)
-    property real radius: Math.min(width, height) * 0.22  // 화면 크기에 비례
-    property real centerX: width/2
-    property real centerY: height/2 + height * 0.04
-
-    // hover 판정 임계거리 (반응형)
-    property real hoverThreshold: Math.min(width, height) * 0.13
-
-    // 버튼 크기 (반응형)
-    property real buttonSize: Math.min(width, height) * 0.16
-
-    // 중심 장식 (반응형)
+    // 그리드 컨테이너 (흰색 둥근 배경)
     Rectangle {
-        id: centerDeco
-        property real decoSize: Math.min(root.width, root.height) * 0.089
-        width: decoSize; height: decoSize; radius: decoSize/2
+        id: gridContainer
+        width: Math.min(root.width * 0.85, root.height * 0.5)
+        height: width
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.height * 0.04
-        color: "#1ad1ff22" // cyan-500/20
-        border.color: "#ffffff18"; border.width: 1
+        anchors.verticalCenterOffset: root.height * 0.05
+        radius: 32
+        color: "#f8fafc" // 밝은 회색-흰색
+        border.color: "#e2e8f0"
+        border.width: 2
+
         layer.enabled: true
         layer.effect: MultiEffect {
-            blurEnabled: true
-            blur: 0.35
+            shadowEnabled: true
+            shadowOpacity: 0.15
+            shadowBlur: 1.0
+            shadowColor: "#000000"
         }
-        SequentialAnimation on scale {
-            loops: Animation.Infinite
-            NumberAnimation { to: 1.05; duration: 2000; easing.type: Easing.InOutQuad }
-            NumberAnimation { to: 1.0;  duration: 2000; easing.type: Easing.InOutQuad }
-        }
-        Rectangle {
-            width: parent.width * 0.5; height: parent.height * 0.5
-            radius: width/2
+
+        // 2x2 그리드
+        Grid {
+            id: grid
+            columns: 2
+            rows: 2
+            spacing: gridContainer.width * 0.04
             anchors.centerIn: parent
-            color: "#66d1ff33"
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                blurEnabled: true
-                blur: 0.25
-            }
-        }
-    }
+            anchors.margins: gridContainer.width * 0.06
 
-    // 4개 버튼 배치 (반응형)
-    Repeater {
-        model: modes.length
-        delegate: Item {
-            width: buttonSize; height: buttonSize
-            property int idx: index
-            property var m: modes[idx]
-            property real angleDeg: (idx * 90) - 45   // 상단 우측부터 시계방향
-            property real angle: angleDeg * Math.PI / 180
-            x: centerX + radius * Math.cos(angle) - width/2
-            y: centerY + radius * Math.sin(angle) - height/2
+            Repeater {
+                model: modes.length
+                delegate: Rectangle {
+                    id: card
+                    property int idx: index
+                    property var m: modes[idx]
+                    width: (gridContainer.width - grid.spacing - gridContainer.width * 0.12) / 2
+                    height: width
+                    radius: 20
 
-            // 카드 본체
-            Rectangle {
-                id: card
-                anchors.fill: parent
-                radius: 24
-                border.color: "#ffffff18"; border.width: 1
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: m.gradientA + "33" } // xx/20 비슷
-                    GradientStop { position: 1.0; color: m.gradientB + "33" }
-                }
-                // hover 시 스케일업/그로우
-                scale: hoveredIndex === idx ? 1.1 : 1.0
-                Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-
-                // 그림자만 적용 (블러 제거로 선명하게)
-                layer.enabled: true
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowOpacity: hoveredIndex === idx ? 0.6 : 0.4
-                    shadowBlur: 0.8
-                    shadowColor: "#000000"
-                }
-
-                // 내용 (반응형)
-                Column {
-                    anchors.centerIn: parent
-                    spacing: buttonSize * 0.045
-                    Text {
-                        text: m.icon
-                        font.pixelSize: buttonSize * 0.32
-                        horizontalAlignment: Text.AlignHCenter
-                        anchors.horizontalCenter: parent.horizontalCenter
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: m.gradientA }
+                        GradientStop { position: 1.0; color: m.gradientB }
                     }
-                    Text {
-                        text: m.label
-                        color: "white"
-                        font.pixelSize: buttonSize * 0.11
-                        font.weight: Font.Medium
-                        horizontalAlignment: Text.AlignHCenter
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    // 설명: hover 시만 노출
-                    Text {
-                        text: m.id === "custom"  ? "Personalize your display" :
-                              m.id === "glass"   ? "Transparent ambient view" :
-                              m.id === "privacy" ? "Focus & concentration" :
-                                                   "Smart mood detection"
-                        color: "#ffffff80"
-                        font.pixelSize: buttonSize * 0.068
-                        opacity: hoveredIndex === idx ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 180 } }
-                        horizontalAlignment: Text.AlignHCenter
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                }
 
-                // 마우스 클릭(개발 편의)
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: hoveredIndex = idx
-                    onExited: if (hoveredIndex === idx) hoveredIndex = -1
-                    onClicked: router.navigateTo(m.id)
+                    // 투명도 적용
+                    opacity: 0.75
+
+                    // hover 시 스케일업
+                    scale: hoveredIndex === idx ? 1.05 : 1.0
+                    Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowOpacity: hoveredIndex === idx ? 0.3 : 0.15
+                        shadowBlur: 0.8
+                        shadowColor: "#000000"
+                    }
+
+                    // 카드 내용
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: card.height * 0.08
+
+                        // 아이콘
+                        Text {
+                            text: m.icon
+                            font.pixelSize: card.height * 0.3
+                            horizontalAlignment: Text.AlignHCenter
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+
+                        // 라벨 (단순 텍스트)
+                        Text {
+                            text: m.label
+                            color: m.textColor
+                            font.pixelSize: card.height * 0.1
+                            font.weight: Font.DemiBold
+                            horizontalAlignment: Text.AlignHCenter
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+
+                    // 마우스 클릭 (개발 편의)
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: hoveredIndex = idx
+                        onExited: if (hoveredIndex === idx) hoveredIndex = -1
+                        onClicked: router.navigateTo(m.id)
+                    }
                 }
             }
         }
@@ -254,39 +227,61 @@ Item {
     // ====== 커서 (mediapipe 제스처 포인터, 반응형) ======
     Rectangle {
         id: cursor
-        property real cursorSize: Math.min(root.width, root.height) * 0.03
+        property real cursorSize: Math.min(root.width, root.height) * 0.02
         width: cursorSize; height: cursorSize; radius: cursorSize/2
         x: cursorX - width/2
         y: cursorY - height/2
-        color: "white"; opacity: 0.9
+        color: "#3b82f6" // 파란색
+        opacity: 0.9
         visible: typeof gestureBridge !== 'undefined' && gestureBridge.handDetected
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowOpacity: 0.6
             shadowBlur: 0.5
-            shadowColor: "#000000"
+            shadowColor: "#1e40af"
         }
         Behavior on scale { NumberAnimation { duration: 100 } }
-        scale: hoveredIndex >= 0 ? 1.15 : 1.0
+        scale: hoveredIndex >= 0 ? 1.3 : 1.0
     }
 
     // ====== hover 판정 타이머 ======
     Timer {
         interval: 60; running: true; repeat: true
         onTriggered: {
+            // 그리드 컨테이너가 준비되지 않았으면 스킵
+            if (!gridContainer || gridContainer.width === 0) return
+
             let best = -1
             let bestDist = 1e9
-            for (let i=0; i<modes.length; ++i) {
-                const angleDeg = (i * 90) - 45
-                const angle = angleDeg * Math.PI / 180
-                const cx = centerX + radius * Math.cos(angle)
-                const cy = centerY + radius * Math.sin(angle)
+
+            // 카드 크기와 그리드 계산
+            const cardWidth = (gridContainer.width - grid.spacing - gridContainer.width * 0.12) / 2
+            const cardHeight = cardWidth
+            const containerX = gridContainer.x
+            const containerY = gridContainer.y
+            const padding = gridContainer.width * 0.06
+
+            for (let i = 0; i < modes.length; ++i) {
+                const row = Math.floor(i / 2)
+                const col = i % 2
+
+                // 각 카드의 중심 위치 계산
+                const cx = containerX + padding + col * (cardWidth + grid.spacing) + cardWidth / 2
+                const cy = containerY + padding + row * (cardHeight + grid.spacing) + cardHeight / 2
+
                 const dx = cursorX - cx
                 const dy = cursorY - cy
                 const d = Math.hypot(dx, dy)
-                if (d < bestDist) { bestDist = d; best = i }
+
+                if (d < bestDist) {
+                    bestDist = d
+                    best = i
+                }
             }
+
+            // hover 임계값: 카드 크기의 절반 정도
+            const hoverThreshold = cardWidth * 0.6
             hoveredIndex = (bestDist < hoverThreshold) ? best : -1
         }
     }

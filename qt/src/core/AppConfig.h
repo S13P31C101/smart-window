@@ -22,6 +22,7 @@ class AppConfig : public QObject
     Q_PROPERTY(int mqttPort READ mqttPort NOTIFY configChanged)
     Q_PROPERTY(QString weatherApiKey READ weatherApiKey NOTIFY configChanged)
     Q_PROPERTY(QString spotifyClientId READ spotifyClientId NOTIFY configChanged)
+    Q_PROPERTY(QString applicationDirPath READ applicationDirPath CONSTANT)
 
 public:
     explicit AppConfig(QObject *parent = nullptr);
@@ -63,6 +64,8 @@ public:
     QString spotifyClientId() const { return m_spotifyClientId; }
     QString spotifyClientSecret() const { return m_spotifyClientSecret; }
     QString spotifyRedirectUri() const { return m_spotifyRedirectUri; }
+
+    QString applicationDirPath() const;
 
     // Setters
     void setGestureEnabled(bool enabled);
