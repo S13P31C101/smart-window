@@ -257,6 +257,20 @@ def sunset_blend_pipeline(original_bytes, sunset_file_path, alpha=0.7, prompt="s
 #  ------- scene-blend-s3
 
 
+async def sky_mask_segformer(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Segformer를 이용해 sky mask (원본 해상도의 bool numpy array) 반환
+    """
+    pil_img = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)).convert("RGB").resize((1024, 1024))
+    inputs = seg_processor(images=pil_img, return_tensors="pt")
+    seg_model.eval()
+    with torch.no_grad():
+        outputs = seg_model(**inputs)
+        mask = torch.argmax(outputs.logits.squeeze(), dim=0).cpu().numpy()
+    sky_mask = (mask == 10)
+    sky_mask_resized = cv2.resize(sky_mask.astype(np.uint8), (image_bgr.shape[1], image_bgr.shape[0]), interpolation=cv2.INTER_NEAREST)
+    return sky_mask_resized  # (H,W) 0/1 np.uint8
+
 def get_scene_prompt(scene_type: str) -> str:
     scene_prompts = {
         "dawn":      "dawn view, early morning soft light, misty atmosphere, calm and serene",
@@ -264,13 +278,16 @@ def get_scene_prompt(scene_type: str) -> str:
         "night":     "night sky, stars, quiet, peaceful and dreamy",
         "afternoon": "afternoon view, bright sky, clear clouds, energetic and lively",
     }
-    return scene_prompts.get(scene_type, scene_prompts["night"])  # 기본값 night
+    return scene_prompts.get(scene_type, scene_prompts["night"])
 
-def inpaint_image_with_prompt(image_np, mask_np, prompt):
+def inpaint_image_with_prompt(image_np, mask_np, prompt, mask_is_sky=False):
     try:
         input_height, input_width = image_np.shape[:2]
         image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
-        mask_pil = Image.fromarray(mask_np).convert("L")
+        if mask_is_sky:
+            mask_pil = Image.fromarray((mask_np.astype(np.uint8)*255)).convert("L")
+        else:
+            mask_pil = Image.fromarray(mask_np).convert("L")
         image_pil_resized = image_pil.resize((512, 512), Image.LANCZOS)
         mask_pil_resized = mask_pil.resize((512, 512), Image.NEAREST)
         print("Starting inpainting...")
