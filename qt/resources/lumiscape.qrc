@@ -32,5 +32,8 @@
         <file>../assets/presets/config.json</file>
         <file>../assets/presets/widgets.json</file>
         <file>../assets/presets/auto_scenes.json</file>
+
+        <!-- Scene Images -->
+        <file>../assets/images/scenes/default.png</file>
     </qresource>
 </RCC>

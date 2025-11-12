@@ -15,7 +15,7 @@
 
   "apis": {
     "weather": {
-      "apiKey": "MY-WEATHER-API-KEY",
+      "apiKey": "MY-WEATHER-KEY",
       "apiUrl": "https://api.openweathermap.org/geo/1.0/direct",
       "defaultCity": "Seoul",
       "updateIntervalMinutes": 10
