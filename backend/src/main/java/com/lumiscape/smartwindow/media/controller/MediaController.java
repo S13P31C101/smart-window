@@ -80,17 +80,15 @@ public class MediaController {
     }
 
     @PostMapping("/ai-upload-url")
-    public ApiResponse<MediaUploadResponse> getAIUploadUrl(@RequestHeader("X-AI-Token") String token,
-                                                           @RequestBody AIUploadUrlRequest request) {
-        MediaUploadResponse response = mediaService.getAIUploadUrl(token, request);
+    public ApiResponse<MediaUploadResponse> getAIUploadUrl(@RequestBody AIUploadUrlRequest request) {
+        MediaUploadResponse response = mediaService.getAIUploadUrl(request);
 
         return ApiResponse.onSuccess(response);
     }
 
     @PostMapping("/ai-callback")
-    public ApiResponse<?> handelCallback(@RequestHeader("X-AI-Token") String token,
-                                         @RequestBody AICallbackRequest request) {
-        mediaService.handleAICallback(token, request);
+    public ApiResponse<?> handelCallback(@RequestBody AICallbackRequest request) {
+        mediaService.handleAICallback(request);
 
         return ApiResponse.onSuccess(HttpStatus.CREATED, null);
     }
