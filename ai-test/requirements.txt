@@ -3,8 +3,9 @@ uvicorn[standard]>=0.21.0
 numpy>=1.23
 opencv-python>=4.7
 pillow>=9.4
-torch>=2.0.0
-torchvision>=0.15.0
+# CPU-only PyTorch (ARM 서버 전용)
+torch==2.1.0+cpu
+torchvision==0.16.0+cpu
 transformers>=4.36.0
 diffusers>=0.27.1
 ultralytics>=8.0

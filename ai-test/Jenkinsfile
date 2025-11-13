@@ -7,7 +7,7 @@ pipeline {
                 checkout scm
             }
         }
-                
+        
         stage('Build FastAPI Docker Image') {
             steps {
                 dir('ai-test') {
@@ -20,7 +20,7 @@ pipeline {
             steps {
                 dir('ai-test/infra') {
                     sh 'docker compose down'
-
+                    // .env는 ai-test/infra/.env에 서버에서 미리 넣어두도록 가정
                     sh 'docker compose up -d --build'
                 }
             }
