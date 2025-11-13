@@ -9,10 +9,8 @@ import { COLORS } from '@/constants/color';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SocialLogin'>;
 
-// 백엔드에서 로그인 성공 후 리디렉션하는 특정 경로
-// 이 경로는 백엔드 개발자와 미리 협의되어야 합니다.
-// 보통 /login/oauth2/code/kakao 같은 주소로 갔다가, 최종적으로 토큰을 포함한 이 주소로 돌아옵니다.
-const REDIRECT_PATH = '/login-success';
+// 백엔드의 AuthController에 명시된 성공 경로와 일치시킵니다.
+const REDIRECT_PATH = '/auth/success';
 
 // 웹페이지의 pre 태그 안에 있는 JSON 문자열을 파싱하기 위한 Javascript 코드
 const INJECTED_JAVASCRIPT = `

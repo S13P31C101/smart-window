@@ -11,47 +11,68 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { COLORS } from '@/constants/color';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+// 1. MainNavigator에서 정의한 ParamList 타입을 import
+import { MainStackParamList } from '@/navigation/MainNavigator';
 
-// 사용자께서 요청하신 목업 데이터
 const mockDevices = [
+  { id: 'smart-window', name: '스마트 창문', status: '등록됨', icon: 'window-closed-variant' },
   { id: '1', name: '공기청정기', status: '등록됨', icon: 'air-purifier' },
   { id: '2', name: '냉장고', status: '등록됨', icon: 'fridge-outline' },
   { id: '3', name: '세탁기', status: '사용할 수 없음', icon: 'washing-machine' },
   { id: '4', name: '에어컨', status: '등록됨', icon: 'air-conditioner' },
-  { id: '5', name: 'Galaxy Buds2', status: '등록됨', icon: 'headphones' },
-  { id: '6', name: 'AVANTE', status: '등록됨', icon: 'car-side' },
-  { id: '7', name: 'NF-5000', status: '등록됨', icon: 'music-note' },
-  { id: '8', name: '기본 S펜', status: '사용할 수 없음', icon: 'pencil-outline' },
 ];
 
 const TABS = ['모든 기기', '거실', '개인 기기'];
 
 const { width } = Dimensions.get('window');
-const cardWidth = (width - 24 * 2 - 16) / 2; // (screenWidth - padding*2 - gap) / 2
+const cardWidth = (width - 24 * 2 - 16) / 2;
 
 type Device = (typeof mockDevices)[0];
 
-const DeviceCard = ({ item }: { item: Device }) => (
-  <View style={[styles.card, { width: cardWidth }]}>
-    <View style={styles.iconContainer}>
-      <MaterialCommunityIcon name={item.icon} size={30} color={COLORS.iconCard} />
-    </View>
-    <Text style={styles.cardTitle}>{item.name}</Text>
-    <Text
-      style={[
-        styles.cardStatus,
-        item.status === '사용할 수 없음' && styles.cardStatusDisabled,
-      ]}>
-      {item.status}
-    </Text>
-  </View>
-);
+// 2. 네비게이션 Prop 타입을 MainStackParamList와 연결
+type MainScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'Main'>;
 
-function HomeScreen() {
-  const [activeTab, setActiveTab] = useState('개인 기기');
+const DeviceCard = ({ item }: { item: Device }) => {
+  // 3. useNavigation 훅에 타입 적용
+  const navigation = useNavigation<MainScreenNavigationProp>();
+
+  const handlePress = () => {
+    if (item.id === 'smart-window') {
+      // 1. 목적지를 'DeviceControl'에서 'Home'으로 다시 변경합니다.
+      navigation.navigate('Home', { deviceId: item.id, deviceName: item.name });
+    } else {
+      console.log(`'${item.name}' 카드를 클릭했습니다.`);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.card, { width: cardWidth }]}
+      onPress={handlePress}
+      activeOpacity={0.8}>
+      <View style={styles.iconContainer}>
+        <MaterialCommunityIcon name={item.icon} size={30} color={COLORS.iconCard} />
+      </View>
+      <Text style={styles.cardTitle}>{item.name}</Text>
+      <Text
+        style={[
+          styles.cardStatus,
+          item.status !== '등록됨' && styles.cardStatusDisabled,
+        ]}>
+        {item.status}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+function MainScreen() {
+  const [activeTab, setActiveTab] = useState('모든 기기');
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* 3. 헤더 및 탭 메뉴 원상 복구 */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.headerIcon}>
@@ -194,4 +215,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+
+export default MainScreen;
