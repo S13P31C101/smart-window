@@ -335,3 +335,60 @@ async def gms_dalle_generate_image(prompt: str) -> str:
             return img_url
         except Exception as e:
             raise RuntimeError(f"이미지 파싱 실패: {e}\n전체 응답: {data}")
+        
+
+
+
+
+def sync_download_image(url: str) -> np.ndarray:
+    resp = httpx.get(url, timeout=30.0)
+    resp.raise_for_status()
+    image_np = np.frombuffer(resp.content, np.uint8)
+    image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+    if image is None:
+        raise Exception("Downloaded image invalid or decode failed")
+    return image
+
+def sync_inpaint_image(image_np, mask_np):
+    input_height, input_width = image_np.shape[:2]
+    image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
+    mask_pil = Image.fromarray(mask_np).convert("L")
+    image_pil_resized = image_pil.resize((512, 512), Image.LANCZOS)
+    mask_pil_resized = mask_pil.resize((512, 512), Image.NEAREST)
+    result = pipe(
+        prompt="natural outdoor landscape, seamless realistic background",
+        image=image_pil_resized,
+        mask_image=mask_pil_resized,
+        guidance_scale=7.5,
+        num_inference_steps=50
+    ).images[0]
+    result = result.resize((input_width, input_height), Image.LANCZOS)
+    return result
+
+def sync_request_ai_upload_url(target_s3_key: str) -> dict:
+    headers = {"X-AI-Token": AI_TOKEN}
+    resp = httpx.post(AI_UPLOAD_URL, json={"s3ObjectKey": target_s3_key}, headers=headers, timeout=30.0)
+    resp.raise_for_status()
+    response_json = resp.json()
+    if response_json.get("status") == 200 and "data" in response_json:
+        return response_json["data"]
+    else:
+        raise Exception("Invalid response structure from AI upload URL")
+
+def sync_upload_to_s3(file_url: str, image_buffer: io.BytesIO):
+    headers = {"Content-Type": "image/png"}
+    resp = httpx.put(file_url, content=image_buffer.getvalue(), headers=headers, timeout=60.0)
+    if resp.status_code not in (200, 201):
+        raise Exception(f"S3 upload failed with status code {resp.status_code}")
+
+def sync_notify_ai_callback(media_id: int, target_s3_key: str):
+    headers = {"X-AI-Token": AI_TOKEN}
+    callback_payload = {
+        "parentMediaId": str(media_id),
+        "s3ObjectKey": target_s3_key,
+        "fileType": "IMAGE"
+    }
+    resp = httpx.post(AI_CALLBACK_URL, json=callback_payload, headers=headers, timeout=30.0)
+    print(f"AI callback status: {resp.status_code}, body: {resp.text}")
+    if resp.status_code not in (200, 201):
+        raise Exception(f"AI callback to BE failed: {resp.status_code}, {resp.text}")
