@@ -20,6 +20,7 @@ spring:
 
 server:
   port: 8080 # 우리 서버가 실행될 포트
+  forward-headers-strategy: framework
 
 # App-specific properties
 app:
@@ -111,7 +112,7 @@ spring:
 
 # CORS 설정
 cors:
-  allowed-origins: http://localhost:*,http://127.0.0.1:*,http://192.168.100.146:*
+  allowed-origins: http://localhost:*,http://127.0.0.1:*,http://192.168.100.146:*,https://k13c101.p.ssafy.io
 
 # Firebase Cloud Messaging 설정
 fcm:
