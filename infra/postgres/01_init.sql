@@ -95,6 +95,11 @@ CREATE TABLE alarms (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
+CREATE TABLE refresh_tokens (
+    user_id BIGINT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(1024) NOT NULL UNIQUE
+);
+
 --
 CREATE TABLE device_groups (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -125,3 +130,4 @@ CREATE INDEX idx_media_parent_media_id ON media (parent_media_id);
 CREATE INDEX idx_alarms_device_id ON alarms (device_id);
 CREATE INDEX idx_user_social_accounts_user_id ON user_social_accounts (user_id);
 CREATE INDEX idx_mobiles_user_id ON mobiles (user_id);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
