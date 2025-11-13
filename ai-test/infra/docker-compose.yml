@@ -18,6 +18,8 @@ services:
     container_name: fastapi-reborn
     ports:
       - "8000:8000"
+    env_file:
+      - .env            # <---- 이 부분 추가!
     networks:
       - network-reborn
 
