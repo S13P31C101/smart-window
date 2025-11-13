@@ -6,6 +6,7 @@ import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.S3Service;
+import com.lumiscape.smartwindow.fcm.service.FcmNotificationService;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.dto.*;
@@ -39,6 +40,7 @@ public class MediaService {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
+    private final FcmNotificationService fcmNotificationService;
     private final @Lazy DeviceService deviceService;
     private final RestTemplate restTemplate;
 

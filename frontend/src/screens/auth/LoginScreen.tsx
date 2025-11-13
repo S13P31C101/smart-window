@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Button } from 'react-native'; // Button 추가
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SocialLoginButton from '@/components/SocialLoginButton';
 import { COLORS } from '@/constants/color'; // 1. COLORS import 추가
@@ -7,17 +7,30 @@ import { useNavigation } from '@react-navigation/native'; // 1. useNavigation im
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // 1. import 경로 수정
 import { AuthStackParamList } from '@/navigation/AuthNavigator'; // 3. AuthStackParamList import
 import { getSocialLoginUrl } from '@/api/auth'; // 4. getSocialLoginUrl import
+import { useAuthStore } from '@/stores/authStore'; // 1. Auth Store import
 
 // 2. 타입 이름 수정
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 function LoginScreen() {
   const navigation = useNavigation<NavigationProp>(); // 6. navigation 객체 생성
+  const { setTokens } = useAuthStore(); // 2. setTokens 함수 가져오기
 
   // 7. handleLogin 함수 수정
   const handleLogin = (provider: 'google' | 'naver' | 'kakao') => {
     const url = getSocialLoginUrl(provider);
     navigation.navigate('SocialLogin', { provider, url });
+  };
+
+  // 3. 개발용 로그인 핸들러 추가
+  const handleDevLogin = () => {
+    console.log('--- DEVELOPMENT LOGIN ---');
+    console.log('Bypassing social login with fake tokens.');
+    setTokens({
+      accessToken: 'fake-access-token-for-development',
+      refreshToken: 'fake-refresh-token-for-development',
+    });
+    // setTokens가 호출되면 RootNavigator가 상태 변화를 감지하고 자동으로 홈 화면으로 이동시킵니다.
   };
 
   return (
@@ -35,6 +48,17 @@ function LoginScreen() {
           <SocialLoginButton provider="google" onPress={() => handleLogin('google')} />
           <SocialLoginButton provider="naver" onPress={() => handleLogin('naver')} />
           <SocialLoginButton provider="kakao" onPress={() => handleLogin('kakao')} />
+
+          {/* 4. 개발 모드에서만 보이는 로그인 버튼 추가 */}
+          {__DEV__ && (
+            <View style={{ marginTop: 20 }}>
+              <Button
+                title="🚀 개발용 로그인"
+                onPress={handleDevLogin}
+                color={COLORS.textAccent}
+              />
+            </View>
+          )}
         </View>
 
         <View style={styles.footer}>

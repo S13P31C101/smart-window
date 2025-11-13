@@ -6,6 +6,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - ./certs:/etc/letsencrypt:ro
     depends_on:
       - spring-reborn
     networks:
@@ -44,7 +46,7 @@ services:
     ports:
       - "8883:8883"
     volumes:
-      - /etc/letsencrypt/live/k13c101.p.ssafy.io:/etc/letsencrypt/live/k13c101.p.ssafy.io
+      - ./certs:/etc/letsencrypt:ro
     networks:
       - network-reborn
 

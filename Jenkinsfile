@@ -11,6 +11,8 @@ pipeline {
         stage('Build Spring JAR') {
             steps {
                 dir('backend') {
+                    sh 'cp /application-oauth.yml ./src/main/resources/application-oauth.yml'
+
                     sh 'chmod +x ./gradlew' 
                     sh './gradlew build -x test'
                 }
@@ -28,9 +30,13 @@ pipeline {
         stage('Run Docker Compose') {
             steps {
                 dir('infra') {
-                    sh 'docker-compose down'
+                    sh 'docker compose down'
                     
-                    sh 'docker-compose up -d --build'
+                    sh 'cp /.env .env'
+                    sh 'mkdir -p ./certs'
+                    sh 'cp -rLT /ssl-certs ./certs'
+                    
+                    sh 'docker compose up -d --build'
                 }
             }
         }
@@ -39,8 +45,6 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
-            // 불필요한 Docker 이미지 정리 등
-            // sh 'docker image prune -f'
         }
     }
 }
