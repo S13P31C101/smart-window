@@ -12,7 +12,7 @@ app = FastAPI()
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-@app.post("/api/v1/media/remove-person/")
+@app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict):
     media_id = request.get("mediaId")
     download_url = request.get("downloadUrl")
@@ -58,13 +58,13 @@ async def remove_person_and_upload(request: dict):
         print(tb)
         return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
 
-@app.post("/upload-image/")
+@app.post("/api/v1/ai/upload-image")
 async def upload_image(file: UploadFile = File(...)):
     contents = await file.read()
     caption = utils.extract_mood_caption(contents)
     return {"mood_caption": caption}
 
-@app.post("/recommend-music/")
+@app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict):
     mood_caption = request.get("mood_caption")
     result = await utils.search_youtube_music(mood_caption + " piano music")
@@ -73,7 +73,7 @@ async def recommend_music(request: dict):
     else:
         return {"message": "No matching music found."}
 
-@app.post("/remove-person/")
+@app.post("/api/v1/ai/remove-person")
 async def remove_person(file: UploadFile = File(...)):
     contents = await file.read()
     image_np = utils.np.frombuffer(contents, utils.np.uint8)
@@ -95,7 +95,7 @@ async def remove_person(file: UploadFile = File(...)):
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
 
-@app.post("/scene-blend/")
+@app.post("/api/v1/ai/scene-blend")
 async def scene_blend(
     original_file: UploadFile = File(...),
     scene_type: str = Form(...),  # dawn, sunset, night, afternoon 중 하나
@@ -121,7 +121,7 @@ async def scene_blend(
 
 
 
-@app.post("/api/v1/media/removehuman-scene/")
+@app.post("/api/v1/ai/removehuman-scene")
 async def removehuman_scene_and_upload(request: dict):
     media_id = request.get("mediaId")
     download_url = request.get("downloadUrl")
@@ -176,7 +176,7 @@ async def removehuman_scene_and_upload(request: dict):
         print(tb)
         return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
 
-@app.post("/generate-dalle-image/")
+@app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
     prompt = request.get("prompt")
     if not prompt or not isinstance(prompt, str):
