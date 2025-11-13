@@ -59,7 +59,6 @@ public class MediaService {
     }
 
     public MediaUploadResponse getUploadUrl(Long userId, MediaUploadRequest request) {
-        userId = 1L;
         String s3ObjectKey = createS3ObjectKey(request.fileName());
         String uploadUrl = s3Service.generatePresignedUrlForUpload(s3ObjectKey);
 
@@ -75,7 +74,6 @@ public class MediaService {
 
     @Transactional
     public MediaResponse registerMedia(Long userId, MediaRegisterRequest request) {
-        userId = 1L;
         if (mediaRepository.existsByFileUrl(request.s3ObjectKey())) {
             log.warn("이미 존재하는 파일입니다..{}", request.s3ObjectKey());
 
