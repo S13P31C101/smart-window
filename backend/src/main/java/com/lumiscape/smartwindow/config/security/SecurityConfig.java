@@ -1,5 +1,6 @@
 package com.lumiscape.smartwindow.config.security;
 
+import com.lumiscape.smartwindow.config.ai.AITokenAuthFilter;
 import com.lumiscape.smartwindow.config.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -23,6 +24,7 @@ public class SecurityConfig {
 
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter; // 1. 주입 받기
+    private final AITokenAuthFilter aiTokenAuthFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -37,12 +39,15 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**", "/auth/success", "/tokens/reissue").permitAll()
+                        .requestMatchers("/api/v1/media/ai-upload-url", "/api/v1/media/ai-callback").hasRole("AI_SERVER")
                         .anyRequest().authenticated()
                 )
 
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oAuth2SuccessHandler)
                 )
+
+                .addFilterBefore(aiTokenAuthFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // 2. JWT 필터 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
