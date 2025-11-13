@@ -62,7 +62,8 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:*",      // PC 웹 브라우저 및 시뮬레이터
                 "http://127.0.0.1:*",      // localhost IP 주소 직접 접근
-                "http://192.168.100.146:*" // 모바일 기기 테스트용 내부 IP
+                "http://192.168.100.146:*", // 모바일 기기 테스트용 내부 IP
+                "https://k13c101.p.ssafy.io"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
