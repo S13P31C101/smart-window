@@ -31,8 +31,9 @@ pipeline {
             steps {
                 dir('infra') {
                     sh 'docker compose down'
-                    
+
                     sh 'cp /.env .env'
+                    sh 'sudo rm -rf ./certs'
                     sh 'mkdir -p ./certs'
                     sh 'cp -rLT /ssl-certs ./certs'
                     
