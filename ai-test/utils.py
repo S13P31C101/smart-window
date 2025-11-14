@@ -16,9 +16,12 @@ from transformers import (
     BlipProcessor, BlipForConditionalGeneration,
     SegformerForSemanticSegmentation, SegformerImageProcessor
 )
+from huggingface_hub import login
+
 
 # 환경 및 모델 로드
 load_dotenv()
+login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 GMS_API_KEY = os.getenv("GMS_API_KEY")
 AI_TOKEN = os.getenv("AI_TOKEN")
