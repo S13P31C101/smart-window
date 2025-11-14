@@ -30,7 +30,6 @@ public class AlarmService {
     private final AlarmRepository alarmRepository;
     private final DeviceRepository deviceRepository;
     private final MqttPublishService mqttPublishService;
-    private final ObjectMapper objectMapper;
 
     public List<AlarmResponse> getAllUserAlarms(Long userId) {
 
@@ -112,7 +111,7 @@ public class AlarmService {
                 .map(AlarmResponse::from)
                 .toList();
 
-        publishMqtt(device.getDeviceUniqueId(), "alarm", alarmPayloads);
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "alarm", alarmPayloads);
 
         log.info("MQTT Publish : deviceUID = {}, Total : {}", device.getDeviceUniqueId(), alarmPayloads.size());
     }
@@ -131,19 +130,8 @@ public class AlarmService {
             payload = Map.of("action", "UPSERT", "alarm", AlarmResponse.from(alarm));
         }
 
-        publishMqtt(device.getDeviceUniqueId(), "alarm", payload);
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "alarm", payload);
 
         log.info("MQTT Publish : deviceUID = {}, Action = {}, AlarmId = {}", device.getDeviceUniqueId(), action, alarm.getId());
-    }
-
-    private void publishMqtt(String deviceUniqueId, String command, Object payload) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-            mqttPublishService.publishCommand(deviceUniqueId, command, jsonPayload);
-        } catch (JsonProcessingException e) {
-            log.error("MQTT Publish FAILED : deviceUID = {}, Command = {}", deviceUniqueId, command, e);
-
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
     }
 }

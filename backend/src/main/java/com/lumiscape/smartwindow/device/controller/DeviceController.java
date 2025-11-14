@@ -59,7 +59,6 @@ public class DeviceController {
     public ApiResponse<?> deleteDevice(@AuthenticationPrincipal UserDetails userDetails,
                                        @PathVariable("device-id") Long deviceId) {
         Long userId = Long.parseLong(userDetails.getUsername());
-        deviceService.deleteDevice(userId, deviceId);
 
         return ApiResponse.onSuccess();
     }
@@ -73,7 +72,7 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PutMapping("/{device-id}/power")
+    @PatchMapping("/{device-id}/power")
     public ApiResponse<DeviceStatusResponse> controlPower(@AuthenticationPrincipal UserDetails userDetails,
                                                           @PathVariable("device-id") Long deviceId,
                                                           @RequestBody DeviceStatusRequest request) {
@@ -92,7 +91,7 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PutMapping("/{device-id}/open")
+    @PatchMapping("/{device-id}/open")
     public ApiResponse<DeviceStatusResponse> controlOpen(@AuthenticationPrincipal UserDetails userDetails,
                                                          @PathVariable("device-id") Long deviceId,
                                                          @RequestBody DeviceStatusRequest request) {
@@ -102,7 +101,7 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PutMapping("/{device-id}/mode/status")
+    @PatchMapping("/{device-id}/mode/status")
     public ApiResponse<DeviceModeStatusResponse> controlModeStatus(@AuthenticationPrincipal UserDetails userDetails,
                                                                    @PathVariable("device-id") Long deviceId,
                                                                    @RequestBody DeviceModeStatusRequest request) {
@@ -112,7 +111,7 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PutMapping("/{device-id}/mode/settings")
+    @PatchMapping("/{device-id}/mode/settings")
     public ApiResponse<DeviceModeSettingsResponse> controlModeSettings(@AuthenticationPrincipal UserDetails userDetails,
                                                                        @PathVariable("device-id") Long deviceId,
                                                                        @RequestBody DeviceModeSettingsRequest request) {
@@ -122,7 +121,7 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PutMapping("/{device-id}/media")
+    @PatchMapping("/{device-id}/media")
     public ApiResponse<DeviceDetailResponse> updateDeviceMedia(@AuthenticationPrincipal UserDetails userDetails,
                                                                @PathVariable("device-id") Long deviceId,
                                                                @RequestBody DeviceMediaUpdateRequest request) {

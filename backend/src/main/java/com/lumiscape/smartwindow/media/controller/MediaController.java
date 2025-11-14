@@ -56,7 +56,7 @@ public class MediaController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PutMapping("/{media-id}/name")
+    @PatchMapping("/{media-id}/name")
     public ApiResponse<MediaResponse> updateMediaName(@AuthenticationPrincipal UserDetails userDetails,
                                                        @PathVariable("media-id") Long mediaId,
                                                        @RequestBody Map<String, String> request) {
@@ -90,7 +90,7 @@ public class MediaController {
     }
 
     @PostMapping("/ai-callback")
-    public ApiResponse<?> handelCallback(@RequestBody AICallbackRequest request) {
+    public ApiResponse<?> handleCallback(@RequestBody AICallbackRequest request) {
         mediaService.handleAICallback(request);
 
         return ApiResponse.onSuccess(HttpStatus.CREATED, null);
