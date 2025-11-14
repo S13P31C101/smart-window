@@ -1,53 +1,167 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException,Body,BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Body, BackgroundTasks
+from fastapi.responses import JSONResponse
 import io
-import utils  # 위의 utils.py에 모든 부속 함수 포함되어 있다고 가정
+import utils  # 위의 utils.py에 모든 부속 함수 포함된 것으로 가정
 import httpx
 import os
+import threading
 from dotenv import load_dotenv
 from PIL import Image
-import asyncio
 
 load_dotenv()
 app = FastAPI()
-jobs_queue = asyncio.Queue()
-queue_lock = asyncio.Lock()
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+# ---------------------------
+# 중복 요청 방지용 job set/락
+processing_jobs = set()
+processing_lock = threading.Lock()
+# ---------------------------
+
+
 @app.post("/api/v1/ai/remove-person")
-async def remove_person_and_upload(request: dict = Body(...)):
+async def remove_person_and_upload(request: dict = Body(...), background_tasks: BackgroundTasks = None):
     media_id = request.get("mediaId")
     download_url = request.get("downloadUrl")
     target_s3_key = request.get("targetAIS3Key")
     if not media_id or not download_url or not target_s3_key:
         raise HTTPException(status_code=400, detail="mediaId, downloadUrl, and targetAIS3Key are required")
 
-    job = {
-        "media_id": media_id,
-        "download_url": download_url,
-        "target_s3_key": target_s3_key,
-    }
-    await jobs_queue.put(job)
+    job_key = str(media_id)  # 혹은 필요에 따라 (media_id, target_s3_key)로 조정 가능
 
-    if queue_lock.locked():
-        # 누군가 작업 중이면 그냥 큐만 쌓고 리턴
-        return JSONResponse(content={"success": True, "message": "Queued. Task will run after previous finishes."})
-    else:
-        # 락이 비어있으면 직접 돌림
-        async with queue_lock:
-            while not jobs_queue.empty():
-                curr_job = await jobs_queue.get()
-                try:
-                    await utils.process_remove_person_job_async(
-                        curr_job["media_id"],
-                        curr_job["download_url"],
-                        curr_job["target_s3_key"]
-                    )
-                except Exception as e:
-                    print("Remove-person job error:", e)
-                jobs_queue.task_done()
-        return JSONResponse(content={"success": True, "message": "Person removal started or queued."})
+    # == 중복 작업 체크
+    with processing_lock:
+        if job_key in processing_jobs:
+            raise HTTPException(status_code=409, detail="이미 해당 mediaId로 작업이 진행 중입니다.")
+        processing_jobs.add(job_key)
+
+    # --- BackgroundJob 정의 (완전 동기 함수) ---
+    def background_job(media_id, download_url, target_s3_key, job_key):
+        try:
+            # 1. 원본 이미지 다운로드
+            image = utils.sync_download_image(download_url)  # sync 버전 필요
+            height, width = image.shape[:2]
+            mask = utils.np.zeros((height, width), utils.np.uint8)
+            # 2. YOLO로 사람 탐지 후 마스크 생성
+            results = utils.yolo_model.predict(image)
+            for r in results:
+                for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
+                    if int(cls) == 0:
+                        # 사람이면 확장 영역 포함 (ex: scale=0.1)
+                        box_expanded = utils.expand_box(box, image.shape, scale=0.1)
+                        x1, y1, x2, y2 = map(int, box_expanded)
+                        mask[y1:y2, x1:x2] = 255
+            # 3. 인페인팅
+            inpainted_image = utils.sync_inpaint_image(image, mask)  # sync 버전 필요
+            buffer = io.BytesIO()
+            inpainted_image.save(buffer, format="PNG")
+            buffer.seek(0)
+            # 4. BE에 AI 업로드 URL 요청
+            ai_upload_data = utils.sync_request_ai_upload_url(target_s3_key)
+            if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
+                raise Exception("S3 object key mismatch or missing in AI upload URL response")
+            file_url = ai_upload_data.get("fileUrl")
+            if not file_url:
+                raise Exception("fileUrl missing in AI upload URL response")
+            # 5. S3에 이미지 업로드
+            utils.sync_upload_to_s3(file_url, buffer)
+            # 6. AI 콜백 전송
+            utils.sync_notify_ai_callback(media_id, target_s3_key)
+            print(f"Background: {target_s3_key} 성공!")
+        except Exception as e:
+            print("BackgroundTask 실패:", e)
+        finally:
+            # 반드시 작업집합에서 빼줌! (성공/실패 무관)
+            with processing_lock:
+                processing_jobs.discard(job_key)
+
+    # 백그라운드 태스크로 실행
+    background_tasks.add_task(background_job, media_id, download_url, target_s3_key, job_key)
+    # 빠른 응답
+    return JSONResponse(content={"success": True, "message": "Person removal started. You will be notified when it is done."})
+
+
+    # == 중복 작업 체크
+    with processing_lock:
+        if job_key in processing_jobs:
+            raise HTTPException(status_code=409, detail="이미 해당 mediaId로 작업이 진행 중입니다.")
+        processing_jobs.add(job_key)
+
+    # --- BackgroundJob 정의 (완전 동기 함수) ---
+    def background_job(media_id, download_url, target_s3_key, job_key):
+        try:
+            # 1. 원본 이미지 다운로드
+            image = utils.sync_download_image(download_url)  # sync 버전 필요
+            height, width = image.shape[:2]
+            mask = utils.np.zeros((height, width), utils.np.uint8)
+            # 2. YOLO로 사람 탐지 후 마스크 생성
+            results = utils.yolo_model.predict(image)
+            for r in results:
+                for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
+                    if int(cls) == 0:
+                        # 사람이면 확장 영역 포함 (ex: scale=0.1)
+                        box_expanded = utils.expand_box(box, image.shape, scale=0.1)
+                        x1, y1, x2, y2 = map(int, box_expanded)
+                        mask[y1:y2, x1:x2] = 255
+            # 3. 인페인팅
+            inpainted_image = utils.sync_inpaint_image(image, mask)  # sync 버전 필요
+            buffer = io.BytesIO()
+            inpainted_image.save(buffer, format="PNG")
+            buffer.seek(0)
+            # 4. BE에 AI 업로드 URL 요청
+            ai_upload_data = utils.sync_request_ai_upload_url(target_s3_key)
+            if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
+                raise Exception("S3 object key mismatch or missing in AI upload URL response")
+            file_url = ai_upload_data.get("fileUrl")
+            if not file_url:
+                raise Exception("fileUrl missing in AI upload URL response")
+            # 5. S3에 이미지 업로드
+            utils.sync_upload_to_s3(file_url, buffer)
+            # 6. AI 콜백 전송
+            utils.sync_notify_ai_callback(media_id, target_s3_key)
+            print(f"Background: {target_s3_key} 성공!")
+        except Exception as e:
+            print("BackgroundTask 실패:", e)
+        finally:
+            # 반드시 작업집합에서 빼줌! (성공/실패 무관)
+            with processing_lock:
+                processing_jobs.discard(job_key)
+
+    # 백그라운드 태스크로 실행
+    background_tasks.add_task(background_job, media_id, download_url, target_s3_key, job_key)
+    # 빠른 응답
+    return JSONResponse(content={"success": True, "message": "Person removal started. You will be notified when it is done."})
+
+
+    # --- BackgroundJob 정의 (완전 동기 함수) ---
+processing_jobs = set()
+processing_lock = threading.Lock()
+
+@app.post("/api/v1/ai/remove-person")
+async def remove_person_and_upload(request: dict = Body(...), background_tasks: BackgroundTasks = None):
+    media_id = request.get("mediaId")
+    download_url = request.get("downloadUrl")
+    target_s3_key = request.get("targetAIS3Key")
+    if not media_id or not download_url or not target_s3_key:
+        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, and targetAIS3Key are required")
+
+    job_key = str(media_id)
+    with processing_lock:
+        if job_key in processing_jobs:
+            raise HTTPException(status_code=409, detail="이미 해당 mediaId로 작업이 진행 중입니다.")
+        processing_jobs.add(job_key)
+
+    def background_job(media_id, download_url, target_s3_key, job_key):
+        try:
+            # --- 기존 처리 코드 ---
+            pass
+        finally:
+            with processing_lock:
+                processing_jobs.discard(job_key)
+
+    background_tasks.add_task(background_job, media_id, download_url, target_s3_key, job_key)
+    return JSONResponse(content={"success": True, "message": "Person removal started. You will be notified when it is done."})
 
 @app.post("/api/v1/ai/upload-image")
 async def upload_image(file: UploadFile = File(...)):

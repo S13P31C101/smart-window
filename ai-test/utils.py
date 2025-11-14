@@ -8,7 +8,6 @@ import httpx
 from PIL import Image
 import traceback
 from fastapi import FastAPI, HTTPException,Body
-import asyncio
 
 from dotenv import load_dotenv
 from ultralytics import YOLO
@@ -393,47 +392,3 @@ def sync_notify_ai_callback(media_id: int, target_s3_key: str):
     print(f"AI callback status: {resp.status_code}, body: {resp.text}")
     if resp.status_code not in (200, 201):
         raise Exception(f"AI callback to BE failed: {resp.status_code}, {resp.text}")
-    
-
-
-
-
-def background_job_remove_person(media_id, download_url, target_s3_key):
-    """
-    기존 remove-person 동기 처리 함수 (main.py -> utils.py로 옮긴 버전)
-    """
-    try:
-        image = sync_download_image(download_url)
-        height, width = image.shape[:2]
-        mask = np.zeros((height, width), np.uint8)
-        # YOLO로 사람 탐지 후 마스킹
-        results = yolo_model.predict(image)
-        for r in results:
-            for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
-                if int(cls) == 0:
-                    box_expanded = expand_box(box, image.shape, scale=0.1)
-                    x1, y1, x2, y2 = map(int, box_expanded)
-                    mask[y1:y2, x1:x2] = 255
-        inpainted_image = sync_inpaint_image(image, mask)
-        buffer = io.BytesIO()
-        inpainted_image.save(buffer, format="PNG")
-        buffer.seek(0)
-        ai_upload_data = sync_request_ai_upload_url(target_s3_key)
-        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-            raise Exception("S3 object key mismatch or missing in AI upload URL response")
-        file_url = ai_upload_data.get("fileUrl")
-        if not file_url:
-            raise Exception("fileUrl missing in AI upload URL response")
-        sync_upload_to_s3(file_url, buffer)
-        sync_notify_ai_callback(media_id, target_s3_key)
-        print(f"Background: {target_s3_key} 성공!")
-    except Exception as e:
-        print("BackgroundTask 실패:", e)
-
-async def process_remove_person_job_async(media_id, download_url, target_s3_key):
-    # 동기 작업을 비동기로 실행
-    await asyncio.get_event_loop().run_in_executor(
-        None,
-        background_job_remove_person,
-        media_id, download_url, target_s3_key
-    )
