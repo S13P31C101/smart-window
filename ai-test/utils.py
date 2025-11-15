@@ -39,15 +39,10 @@ seg_model = SegformerForSemanticSegmentation.from_pretrained(seg_model_id)
 seg_processor = SegformerImageProcessor.from_pretrained(seg_model_id)
 
 pipe = StableDiffusionInpaintPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-2-inpainting",
+    "runwayml/stable-diffusion-inpainting",
     torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
 ).to(device_type)
 
-pipe_sunset = StableDiffusionInpaintPipeline.from_pretrained(
-    "runwayml/stable-diffusion-inpainting",
-    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32,
-    safety_checker=None,
-).to(device_type)
 
 # --- 유틸리티 함수들 ---
 
@@ -244,7 +239,7 @@ def sunset_blend_pipeline(original_bytes, sunset_file_path, alpha=0.7, prompt="s
     mask_for_inpaint = (sky_mask_clean.astype(np.uint8) * 255)
     mask_for_inpaint = cv2.GaussianBlur(mask_for_inpaint, (15, 15), 0)
     mask_img = Image.fromarray(mask_for_inpaint).convert("L").resize((384, 384))
-    inpaint_result = pipe_sunset(
+    inpaint_result = pipe(
         prompt=prompt,
         image=blended_pil,
         mask_image=mask_img,

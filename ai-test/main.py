@@ -6,9 +6,12 @@ import httpx
 import os
 from dotenv import load_dotenv
 from PIL import Image
+from huggingface_hub import login
 
 load_dotenv()
 app = FastAPI()
+#login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
