@@ -1,7 +1,5 @@
 package com.lumiscape.smartwindow.device.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
@@ -34,10 +32,8 @@ public class DeviceService {
 
     private final DeviceRepository deviceRepository;
     private final UserService userService;
-//    private final @Lazy MediaService mediaService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
-    private final ObjectMapper objectMapper;
 
     private MediaService mediaService;
 
@@ -104,7 +100,7 @@ public class DeviceService {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "power", Map.of("status", newStatus));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "power", Map.of("status", newStatus));
 
         device.updatePower(newStatus);
 
@@ -122,7 +118,7 @@ public class DeviceService {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "open", Map.of("status", newStatus));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "open", Map.of("status", newStatus));
 
         device.updateOpen(newStatus);
 
@@ -135,7 +131,7 @@ public class DeviceService {
 
         DeviceMode newMode = DeviceMode.valueOf(request.mode().toUpperCase());
 
-        publishMqttCommand(device.getDeviceUniqueId(), "mode", Map.of("mode", newMode.name()));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", newMode.name());
 
         device.updateMode(newMode);
 
@@ -172,8 +168,8 @@ public class DeviceService {
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
-        Device device = deviceRepository.findByDeviceUniqueId(deviceUniqueId)
-                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+        Device device = findByDeviceUniqueId(deviceUniqueId);
+
         // TODO
         switch (statusType) {
             case "power":
@@ -202,18 +198,6 @@ public class DeviceService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
     }
 
-    private void publishMqttCommand(String deviceUniqueId, String command, Object payload) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-
-            mqttPublishService.publishCommand(deviceUniqueId, command, jsonPayload);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize MQTT payload", e);
-
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     public void publishMediaUpdateToDevice(Device device) {
         Media media = device.getMedia();
 
@@ -227,7 +211,7 @@ public class DeviceService {
 
             Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
 
-            publishMqttCommand(device.getDeviceUniqueId(), "media", payload);
+            mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
         }
     }
 }
