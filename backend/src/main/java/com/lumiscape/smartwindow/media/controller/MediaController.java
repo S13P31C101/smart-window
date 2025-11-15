@@ -22,46 +22,40 @@ public class MediaController {
     private final MediaService mediaService;
 
     @GetMapping
-    public ApiResponse<List<MediaResponse>> getMyMedia(@AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+    public ApiResponse<List<MediaResponse>> getMyMedia(@AuthenticationPrincipal Long userId) {
         List<MediaResponse> responses = mediaService.getMyMedia(userId);
 
         return ApiResponse.onSuccess(responses);
     }
 
     @PostMapping("/upload-url")
-    public ApiResponse<MediaUploadResponse> getUploadUrl(@AuthenticationPrincipal UserDetails userDetails,
+    public ApiResponse<MediaUploadResponse> getUploadUrl(@AuthenticationPrincipal Long userId,
                                                          @RequestBody MediaUploadRequest request) {
-        Long userId = Long.parseLong(userDetails.getUsername());
         MediaUploadResponse response = mediaService.getUploadUrl(userId, request);
 
         return ApiResponse.onSuccess(response);
     }
 
     @PostMapping("/upload")
-    public ApiResponse<MediaResponse> registerMedia(@AuthenticationPrincipal UserDetails userDetails,
+    public ApiResponse<MediaResponse> registerMedia(@AuthenticationPrincipal Long userId,
                                                     @RequestBody MediaRegisterRequest request) {
-        Long userId = Long.parseLong(userDetails.getUsername());
         MediaResponse response = mediaService.registerMedia(userId, request);
 
         return ApiResponse.onSuccess(response);
     }
 
     @GetMapping("/{media-id}")
-    public ApiResponse<MediaResponse> getMediaDetail(@AuthenticationPrincipal UserDetails userDetails,
-                                                      @PathVariable("media-id") Long mediaId) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+    public ApiResponse<MediaResponse> getMediaDetail(@AuthenticationPrincipal Long userId,
+                                                     @PathVariable("media-id") Long mediaId) {
         MediaResponse response = mediaService.getMediaDetail(userId, mediaId);
 
         return ApiResponse.onSuccess(response);
     }
 
     @PatchMapping("/{media-id}/name")
-    public ApiResponse<MediaResponse> updateMediaName(@AuthenticationPrincipal UserDetails userDetails,
-                                                       @PathVariable("media-id") Long mediaId,
-                                                       @RequestBody Map<String, String> request) {
-        Long userId = Long.parseLong(userDetails.getUsername());
-
+    public ApiResponse<MediaResponse> updateMediaName(@AuthenticationPrincipal Long userId,
+                                                      @PathVariable("media-id") Long mediaId,
+                                                      @RequestBody Map<String, String> request) {
         String newName = request.get("fileName");
 
         if (newName == null || newName.isBlank()) {
@@ -74,9 +68,8 @@ public class MediaController {
     }
 
     @DeleteMapping("/{media-id}")
-    public ApiResponse<?> deleteMedia(@AuthenticationPrincipal UserDetails userDetails,
+    public ApiResponse<?> deleteMedia(@AuthenticationPrincipal Long userId,
                                       @PathVariable("media-id") Long mediaId) {
-        Long userId = Long.parseLong(userDetails.getUsername());
         mediaService.deleteMedia(userId, mediaId);
 
         return ApiResponse.onSuccess();

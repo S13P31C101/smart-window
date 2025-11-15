@@ -14,62 +14,49 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/alarms")
 @RequiredArgsConstructor
 public class AlarmController {
 
     private final AlarmService alarmService;
 
-    @GetMapping("/alarms")
-    public ApiResponse<List<AlarmResponse>> getAllUserAlarms(@AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+    @GetMapping
+    public ApiResponse<List<AlarmResponse>> getAllUserAlarms(@AuthenticationPrincipal Long userId) {
         List<AlarmResponse> responses = alarmService.getAllUserAlarms(userId);
 
         return ApiResponse.onSuccess(responses);
     }
 
-    @PostMapping("/alarms")
-    public ApiResponse<AlarmResponse> createAlarm(@AuthenticationPrincipal UserDetails userDetails,
+    @PostMapping
+    public ApiResponse<AlarmResponse> createAlarm(@AuthenticationPrincipal Long userId,
                                                   @RequestBody AlarmCreateRequest request) {
-        Long userId = Long.parseLong(userDetails.getUsername());
         AlarmResponse newAlarm = alarmService.createAlarm(userId, request);
 
         return ApiResponse.onSuccess(HttpStatus.CREATED, newAlarm);
     }
 
-    @GetMapping("/alarms/{alarm-id}")
-    public ApiResponse<AlarmResponse> getAlarmById(@AuthenticationPrincipal UserDetails userDetails,
+    @GetMapping("/{alarm-id}")
+    public ApiResponse<AlarmResponse> getAlarmById(@AuthenticationPrincipal Long userId,
                                                    @PathVariable("alarm-id") Long alarmId) {
-        Long userId = Long.parseLong(userDetails.getUsername());
         AlarmResponse response = alarmService.getAlarmById(userId, alarmId);
 
         return ApiResponse.onSuccess(response);
     }
 
-    @PatchMapping("/alarms/{alarm-id}")
-    public ApiResponse<AlarmResponse> updateAlarm(@AuthenticationPrincipal UserDetails userDetails,
-                                                  @PathVariable("alarm-id") Long alarmId, @RequestBody AlarmUpdateRequest request) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+    @PatchMapping("/{alarm-id}")
+    public ApiResponse<AlarmResponse> updateAlarm(@AuthenticationPrincipal Long userId,
+                                                  @PathVariable("alarm-id") Long alarmId,
+                                                  @RequestBody AlarmUpdateRequest request) {
         AlarmResponse response = alarmService.updateAlarm(userId, alarmId, request);
 
         return ApiResponse.onSuccess(response);
     }
 
-    @DeleteMapping("/alarms/{alarm-id}")
-    public ApiResponse<?> deleteAlarm(@AuthenticationPrincipal UserDetails userDetails,
+    @DeleteMapping("/{alarm-id}")
+    public ApiResponse<?> deleteAlarm(@AuthenticationPrincipal Long userId,
                                       @PathVariable("alarm-id") Long alarmId) {
-        Long userId = Long.parseLong(userDetails.getUsername());
         alarmService.deleteAlarm(userId, alarmId);
 
         return ApiResponse.onSuccess();
-    }
-
-    @GetMapping("/devices/{device-id}/alarms")
-    public ApiResponse<List<AlarmResponse>> getAlarmsByDevice(@AuthenticationPrincipal UserDetails userDetails,
-                                                              @PathVariable("device-id") Long deviceId) {
-        Long userId = Long.parseLong(userDetails.getUsername());
-        List<AlarmResponse> responses = alarmService.getAlarmsByDevice(userId, deviceId);
-
-        return ApiResponse.onSuccess(responses);
     }
 }
