@@ -11,12 +11,14 @@ import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
-import com.lumiscape.smartwindow.media.repository.MediaRepository;
+import com.lumiscape.smartwindow.media.service.MediaService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
-import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 
+import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,11 +33,18 @@ import java.util.stream.Collectors;
 public class DeviceService {
 
     private final DeviceRepository deviceRepository;
-    private final UserRepository userRepository;
-    private final MediaRepository mediaRepository;
+    private final UserService userService;
+//    private final @Lazy MediaService mediaService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
     private final ObjectMapper objectMapper;
+
+    private MediaService mediaService;
+
+    @Autowired
+    public void setMediaService(@Lazy MediaService mediaService) {
+        this.mediaService = mediaService;
+    }
 
     public List<DeviceDetailResponse> getMyDevice(Long userId) {
 
@@ -50,7 +59,7 @@ public class DeviceService {
             throw new CustomException(ErrorCode.DEVICE_ALREADY_EXISTS);
         }
 
-        User userReference = userRepository.getReferenceById(userId);
+        User userReference = userService.getUserReference(userId);
 
         Device newDevice = Device.builder()
                 .user(userReference)
@@ -149,8 +158,7 @@ public class DeviceService {
 
         Media media = null;
         if (mediaId != null) {
-            media = mediaRepository.findByIdAndUserId(mediaId, userId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
+            media = mediaService.findMediaByUser(mediaId, userId);
         }
 
         device.updateMedia(media);
@@ -179,14 +187,25 @@ public class DeviceService {
         }
     }
 
-    private Device findDeviceByUser(Long deviceId, Long userId) {
+    @Transactional(readOnly = true)
+    public Device findDeviceByUser(Long deviceId, Long userId) {
         return deviceRepository.findByIdAndUserId(deviceId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FORBIDDEN_DEVICE_ACCESS));
+    }
+
+    public List<Device> findByAllMedia(Media media) {
+        return deviceRepository.findAllByMedia(media);
+    }
+
+    public Device findByDeviceUniqueId(String deviceUniqueId) {
+        return deviceRepository.findByDeviceUniqueId(deviceUniqueId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
     }
 
     private void publishMqttCommand(String deviceUniqueId, String command, Object payload) {
         try {
             String jsonPayload = objectMapper.writeValueAsString(payload);
+
             mqttPublishService.publishCommand(deviceUniqueId, command, jsonPayload);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize MQTT payload", e);
