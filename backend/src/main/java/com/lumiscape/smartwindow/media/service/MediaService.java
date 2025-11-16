@@ -15,6 +15,7 @@ import com.lumiscape.smartwindow.media.repository.MediaRepository;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 
+import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,8 +38,7 @@ import java.util.stream.Collectors;
 public class MediaService {
 
     private final MediaRepository mediaRepository;
-    private final DeviceRepository deviceRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final S3Service s3Service;
     private final FcmNotificationService fcmNotificationService;
     private final @Lazy DeviceService deviceService;
@@ -80,7 +80,7 @@ public class MediaService {
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
 
-        User userReference = userRepository.getReferenceById(userId);
+        User userReference = userService.getUserReference(userId);
 
         Media media = Media.builder()
                 .user(userReference)
@@ -118,7 +118,7 @@ public class MediaService {
     public void deleteMedia(Long userId, Long mediaId) {
         Media mediaToDelete = findMediaByUser(mediaId, userId);
 
-        List<Device> affectedDevices = deviceRepository.findAllByMedia(mediaToDelete);
+        List<Device> affectedDevices = deviceService.findByAllMedia(mediaToDelete);
 
         Media replacementMedia = (mediaToDelete.getOriginType() == MediaOrigin.AI_GENERATED && mediaToDelete.getParentMedia() != null)
                 ? mediaToDelete.getParentMedia() : null;
@@ -165,7 +165,7 @@ public class MediaService {
         // TODO FCM Push
     }
 
-    private Media findMediaByUser(Long mediaId, Long userId) {
+    public Media findMediaByUser(Long mediaId, Long userId) {
         return mediaRepository.findByIdAndUserId(mediaId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
     }
