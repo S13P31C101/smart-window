@@ -245,7 +245,7 @@ void SpotifyProvider::parsePlaybackData(const QVariantMap &data)
 
         if (hasTrackChanged) {
             emit trackChanged();
-            qInfo() << "Now playing:" << m_trackName << "by" << m_artistName;
+            qInfo() << "Track changed - Now playing:" << m_trackName << "by" << m_artistName;
         }
     }
 
