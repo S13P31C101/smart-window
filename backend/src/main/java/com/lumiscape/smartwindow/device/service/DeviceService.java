@@ -1,5 +1,6 @@
 package com.lumiscape.smartwindow.device.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
@@ -170,15 +171,19 @@ public class DeviceService {
 
         Device device = findByDeviceUniqueId(deviceUniqueId);
 
-        // TODO
         switch (statusType) {
             case "power":
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
+                // TODO FCM
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
                 device.updateOpen(open);
+                // TODO FCM
+                break;
+            case "sensor":
+                // TODO FCM
                 break;
         }
     }
@@ -208,10 +213,10 @@ public class DeviceService {
             mediaId = media.getId();
 
             mediaUrl = s3Service.generatePresignedUrlForDownload(media.getFileUrl());
-
-            Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
-
-            mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
         }
+
+        Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
     }
 }
