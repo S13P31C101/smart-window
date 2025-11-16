@@ -155,63 +155,41 @@ Item {
         visible: spotifyProvider.authenticated
     }
 
-    // Back button
-    Button {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: Theme.spacingL
-        text: "← Menu"
-        onClicked: router.navigateTo("menu")
+    // Back button - Gesture controlled and vertically centered
+    GestureControlledUI {
+        anchors.left: root.left
+        anchors.verticalCenter: root.verticalCenter
+        anchors.margins: root.width * 0.03
 
-        background: GlassCard {
-            implicitWidth: 100
-            implicitHeight: 40
-        }
-
-        contentItem: Text {
-            text: parent.text
-            color: Theme.textPrimary
-            font.pixelSize: Theme.fontSizeBody
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+        MinimalButton {
+            text: "← Menu"
+            implicitWidth: root.width * 0.12
+            implicitHeight: root.height * 0.055
+            buttonRadius: 28
+            onClicked: router.navigateTo("menu")
         }
     }
 
-    // Image/Video toggle button
-    Button {
-        id: mediaToggleButton
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: Theme.spacingL
-        text: isVideoMode ? "📷 Image" : "🎥 Video"
-        onClicked: {
-            isVideoMode = !isVideoMode
-            if (isVideoMode) {
-                console.log("Switched to video mode")
-            } else {
-                console.log("Switched to image mode")
+    // Image/Video toggle button - Gesture controlled and vertically centered
+    GestureControlledUI {
+        anchors.right: root.right
+        anchors.verticalCenter: root.verticalCenter
+        anchors.margins: root.width * 0.03
+
+        MinimalButton {
+            id: mediaToggleButton
+            text: isVideoMode ? "📷 Image" : "🎥 Video"
+            implicitWidth: root.width * 0.14
+            implicitHeight: root.height * 0.055
+            buttonRadius: 28
+            onClicked: {
+                isVideoMode = !isVideoMode
+                if (isVideoMode) {
+                    console.log("Switched to video mode")
+                } else {
+                    console.log("Switched to image mode")
+                }
             }
-        }
-
-        background: GlassCard {
-            implicitWidth: 120
-            implicitHeight: 40
-        }
-
-        contentItem: Text {
-            text: parent.text
-            color: Theme.textPrimary
-            font.pixelSize: Theme.fontSizeBody
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-        }
-
-        // Subtle pulse animation to indicate interactivity
-        SequentialAnimation on opacity {
-            running: true
-            loops: Animation.Infinite
-            NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutQuad }
-            NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutQuad }
         }
     }
 

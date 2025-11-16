@@ -7,133 +7,135 @@ import "../styles"
 Item {
     id: root
 
-    width: Window.window ? Window.window.width * 0.74 : 800
-    height: Window.window ? Window.window.height * 0.03125 : 60
+    width: Window.window ? Window.window.width * 0.5 : 540
+    height: Window.window ? Window.window.height * 0.08 : 80
 
+    // Main content - horizontal layout (no box)
     Row {
         anchors.centerIn: parent
-        spacing: Window.window ? Window.window.width * 0.0185 : 20
+        spacing: Window.window ? Window.window.width * 0.025 : 27
 
-        // 날씨 아이콘
+        // Weather icon
         Text {
+            id: weatherIcon
             text: getWeatherIcon(weatherProvider.condition)
-            font.pixelSize: Window.window ? Window.window.width * 0.044 : 48
+            font.pixelSize: Window.window ? Window.window.width * 0.04 : 43
             anchors.verticalCenter: parent.verticalCenter
 
-            // 아이콘 애니메이션
+            // Gentle pulse animation
             SequentialAnimation on scale {
                 loops: Animation.Infinite
-                NumberAnimation { to: 1.1; duration: 2000; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: 1.08; duration: 2500; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: 1.0; duration: 2500; easing.type: Easing.InOutQuad }
             }
         }
 
-        // 온도
+        // Temperature - bold and prominent
         Text {
             text: weatherProvider.temperature
-            font.pixelSize: Window.window ? Window.window.width * 0.037 : 40
+            font.pixelSize: Window.window ? Window.window.width * 0.032 : 35
             font.weight: Font.Bold
-            color: Theme.alpha("#ffffff", 1.0)
+            color: "#ffffff"
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        // 구분선
+        // Vertical separator
         Rectangle {
-            width: 2
-            height: Window.window ? Window.window.height * 0.021 : 40
-            color: Theme.alpha("#ffffff", 0.3)
+            width: 1.5
+            height: root.height * 0.6
+            color: Qt.rgba(1, 1, 1, 0.3)
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        // 날씨 상태
+        // Weather condition
         Text {
             text: weatherProvider.condition
-            font.pixelSize: Window.window ? Window.window.width * 0.0185 : 20
-            font.weight: Theme.fontWeightMedium
-            color: Theme.alpha("#ffffff", 0.85)
+            font.pixelSize: Window.window ? Window.window.width * 0.018 : 19
+            font.weight: Font.Medium
+            color: Qt.rgba(1, 1, 1, 0.9)
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        // 도시명
+        // City name
         Row {
-            spacing: Window.window ? Window.window.width * 0.0056 : 6
+            spacing: 5
             anchors.verticalCenter: parent.verticalCenter
 
             Text {
                 text: "📍"
-                font.pixelSize: Window.window ? Window.window.width * 0.0167 : 18
+                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
                 opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: weatherProvider.city
-                font.pixelSize: Window.window ? Window.window.width * 0.0167 : 18
-                font.weight: Theme.fontWeightMedium
-                color: Theme.alpha("#ffffff", 0.75)
+                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                font.weight: Font.Medium
+                color: Qt.rgba(1, 1, 1, 0.8)
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
 
-        // 구분선
+        // Vertical separator
         Rectangle {
-            width: 2
-            height: Window.window ? Window.window.height * 0.021 : 40
-            color: Theme.alpha("#ffffff", 0.3)
+            width: 1.5
+            height: root.height * 0.6
+            color: Qt.rgba(1, 1, 1, 0.3)
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        // 습도
+        // Humidity
         Row {
-            spacing: Window.window ? Window.window.width * 0.0056 : 6
+            spacing: 5
             anchors.verticalCenter: parent.verticalCenter
 
             Text {
                 text: "💧"
-                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                font.pixelSize: Window.window ? Window.window.width * 0.013 : 14
+                opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: weatherProvider.humidity + "%"
-                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
-                font.weight: Theme.fontWeightMedium
-                color: Theme.alpha("#ffffff", 0.75)
+                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
+                color: Qt.rgba(1, 1, 1, 0.75)
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
 
-        // 풍속
+        // Wind speed
         Row {
-            spacing: Window.window ? Window.window.width * 0.0056 : 6
+            spacing: 5
             anchors.verticalCenter: parent.verticalCenter
 
             Text {
                 text: "💨"
-                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                font.pixelSize: Window.window ? Window.window.width * 0.013 : 14
+                opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: weatherProvider.windSpeed.toFixed(1) + " m/s"
-                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
-                font.weight: Theme.fontWeightMedium
-                color: Theme.alpha("#ffffff", 0.75)
+                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
+                color: Qt.rgba(1, 1, 1, 0.75)
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
     }
 
-    // 로딩/에러 상태
+    // Loading/Error state
     Text {
         anchors.centerIn: parent
         text: weatherProvider.loading ? "Loading weather..." : weatherProvider.error
         font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
-        color: weatherProvider.error !== "" ? Theme.error : Theme.alpha("#ffffff", 0.7)
+        color: weatherProvider.error !== "" ? "#ef4444" : Qt.rgba(1, 1, 1, 0.8)
         visible: weatherProvider.loading || weatherProvider.error !== ""
     }
 
-    // 날씨 아이콘
+    // Weather icon mapping
     function getWeatherIcon(condition) {
         switch (condition.toLowerCase()) {
             case "clear": return "☀️"
@@ -146,5 +148,17 @@ Item {
             case "fog": return "🌫️"
             default: return "🌤️"
         }
+    }
+
+    // Smooth hover effect
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        onEntered: parent.scale = 1.03
+        onExited: parent.scale = 1.0
+    }
+
+    Behavior on scale {
+        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
     }
 }

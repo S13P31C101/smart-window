@@ -39,27 +39,18 @@ Item {
         }
     }
 
-    // Back button
-    Button {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: Theme.spacingL
-        text: "← Menu"
-        onClicked: router.navigateTo("menu")
+    // Back button - Gesture controlled and vertically centered
+    GestureControlledUI {
+        anchors.left: root.left
+        anchors.verticalCenter: root.verticalCenter
+        anchors.margins: root.width * 0.03
 
-        background: Rectangle {
-            implicitWidth: 100
-            implicitHeight: 40
-            radius: Theme.radiusM
-            color: Theme.backgroundLight
-        }
-
-        contentItem: Text {
-            text: parent.text
-            color: Theme.textPrimary
-            font.pixelSize: Theme.fontSizeBody
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+        MinimalButton {
+            text: "← Menu"
+            implicitWidth: root.width * 0.12
+            implicitHeight: root.height * 0.055
+            buttonRadius: 28
+            onClicked: router.navigateTo("menu")
         }
     }
 }

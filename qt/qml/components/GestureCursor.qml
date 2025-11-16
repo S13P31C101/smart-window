@@ -1,11 +1,10 @@
 import QtQuick 2.15
 import QtQuick.Effects
-import "../styles"
 
 Item {
     id: root
-    width: Theme.cursorSize
-    height: Theme.cursorSize
+    width: 48
+    height: 48
 
     property string cursorState: "idle"  // idle, point, click
 
@@ -22,13 +21,14 @@ Item {
 
         color: {
             switch (root.cursorState) {
-                case "click": return Theme.accent
-                case "point": return Theme.primary
-                default: return Theme.alpha(Theme.primary, 0.6)
+                case "click": return "#60a5fa"  // blue-400 (accent)
+                case "point": return "#22d3ee"  // cyan-400 (primary)
+                default: return "#3b82f6"       // blue-600 (default)
             }
         }
 
-        border.color: Theme.glassBorder
+        opacity: 0.9
+        border.color: "#ffffff"
         border.width: 2
 
         // Pulse animation on click
@@ -43,7 +43,7 @@ Item {
 
         Behavior on color {
             ColorAnimation {
-                duration: Theme.animationFast
+                duration: 150
             }
         }
 
@@ -53,7 +53,7 @@ Item {
             width: parent.width * 0.3
             height: parent.height * 0.3
             radius: width / 2
-            color: Theme.textPrimary
+            color: "#ffffff"
             opacity: 0.8
         }
 
@@ -76,11 +76,11 @@ Item {
 
         Rectangle {
             anchors.centerIn: parent
-            width: Theme.cursorSize
-            height: Theme.cursorSize
+            width: 48
+            height: 48
             radius: width / 2
             color: "transparent"
-            border.color: Theme.accent
+            border.color: "#60a5fa"  // blue-400
             border.width: 2
             opacity: 0
 
@@ -92,13 +92,13 @@ Item {
 
             NumberAnimation on width {
                 running: true
-                to: Theme.cursorSize * 2
+                to: 96
                 duration: 500
             }
 
             NumberAnimation on height {
                 running: true
-                to: Theme.cursorSize * 2
+                to: 96
                 duration: 500
             }
         }
@@ -130,7 +130,7 @@ Item {
 
             if (points.length < 2) return
 
-            ctx.strokeStyle = Theme.primary
+            ctx.strokeStyle = "#22d3ee"  // cyan-400
             ctx.lineWidth = 3
             ctx.lineCap = "round"
             ctx.lineJoin = "round"
