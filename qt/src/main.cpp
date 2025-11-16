@@ -3,6 +3,8 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QIcon>
+#include <QTimer>
+#include <QtWebEngineQuick/QtWebEngineQuick>
 
 #include "core/AppConfig.h"
 #include "core/Router.h"
@@ -15,10 +17,19 @@
 #include "widgets/ClockProvider.h"
 #include "widgets/WeatherProvider.h"
 #include "widgets/SpotifyProvider.h"
+// #include "widgets/YouTubeProvider.h"  // Removed: using WebEngine-based QML player instead
+#include "widgets/SensorManager.h"
+#include "hardware/PDLCController.h"
+#include "hardware/WindowController.h"
 #include "integrations/SpotifyAuthHelper.h"
 
 int main(int argc, char *argv[])
 {
+    // ========================================================================
+    // WebEngine Initialization (must be called before QGuiApplication)
+    // ========================================================================
+    QtWebEngineQuick::initialize();
+
     // ========================================================================
     // Application Setup
     // ========================================================================
@@ -53,14 +64,203 @@ int main(int argc, char *argv[])
     QObject::connect(&mediaPipeClient, &MediaPipeClient::gestureDataReceived,
                      &gestureBridge, &GestureBridge::updateGesture);
 
+    // ========================================================================
+    // Hardware Control Setup
+    // ========================================================================
+
+    // PDLC controller for smart glass transparency
+    auto pdlcController = new PDLCController(&app);
+    qInfo() << "PDLC Controller created, ready status:" << pdlcController->isReady();
+
+    // Window controller for automatic window opener/closer
+    auto windowController = new WindowController(&app);
+    qInfo() << "Window Controller created, connected status:" << windowController->isConnected();
+
     // MQTT client for IoT communication
     MqttClient mqttClient;
     mqttClient.connectToHost(
         config.mqttHost(),
         config.mqttPort(),
         config.mqttUsername(),
-        config.mqttPassword()
+        config.mqttPassword(),
+        config.mqttUseTls()
     );
+
+    // Simple MQTT message handler for testing
+    QObject::connect(&mqttClient, &MqttClient::jsonMessageReceived,
+                     [&config, &router, &mediaPipeClient, pdlcController, windowController](const QString &topic, const QVariantMap &data) {
+        qInfo() << "========================================";
+        qInfo() << "MQTT Message Received!";
+        qInfo() << "Topic:" << topic;
+        qInfo() << "Data:" << data;
+        qInfo() << "========================================";
+
+        // Parse topic to extract command
+        QStringList parts = topic.split("/");
+        if (parts.size() >= 5 && parts[3] == "command") {
+            QString command = parts[4];
+            qInfo() << "Command type:" << command;
+
+            if (command == "power") {
+                bool status = data["status"].toBool();
+                qInfo() << ">>> Power command received! Status:" << (status ? "ON" : "OFF");
+
+                if (status) {
+                    // ===== Power ON: Smart Standby → Active =====
+                    qInfo() << "========================================";
+                    qInfo() << "POWERING ON - Exiting Smart Standby";
+                    qInfo() << "========================================";
+
+                    // Re-enable auto-restart and resume gesture recognition
+                    mediaPipeClient.setAutoRestart(true);
+                    mediaPipeClient.start();
+                    qInfo() << "  ✓ Gesture recognition: STARTED (auto-restart enabled)";
+
+                    // Navigate to menu (or could restore previous mode)
+                    router.navigateTo("menu");
+                    qInfo() << "  ✓ Navigated to: Menu";
+
+                    // PDLC stays opaque (will be controlled by mode selection)
+                    pdlcController->setOpaque();
+                    qInfo() << "  ✓ PDLC: Opaque (default)";
+
+                    qInfo() << "========================================";
+                    qInfo() << "System Status: ACTIVE";
+                    qInfo() << "  - Display: ON";
+                    qInfo() << "  - Gesture: ON";
+                    qInfo() << "  - Sensors: ON (continuous)";
+                    qInfo() << "  - MQTT: ON (continuous)";
+                    qInfo() << "  - Window Control: ON (full)";
+                    qInfo() << "========================================";
+
+                } else {
+                    // ===== Power OFF: Active → Smart Standby =====
+                    qInfo() << "========================================";
+                    qInfo() << "POWERING OFF - Entering Smart Standby";
+                    qInfo() << "========================================";
+
+                    // Disable auto-restart and stop gesture recognition (save power)
+                    mediaPipeClient.setAutoRestart(false);
+                    mediaPipeClient.stop();
+                    qInfo() << "  ✓ Gesture recognition: STOPPED (auto-restart disabled)";
+
+                    // Navigate to standby screen
+                    router.navigateTo("standby");
+                    qInfo() << "  ✓ Navigated to: Standby Screen";
+
+                    // Set PDLC to opaque for privacy
+                    pdlcController->setOpaque();
+                    qInfo() << "  ✓ PDLC: Opaque (privacy)";
+
+                    qInfo() << "========================================";
+                    qInfo() << "System Status: SMART STANDBY";
+                    qInfo() << "  - Display: OFF (minimal UI)";
+                    qInfo() << "  - Gesture: OFF (power save)";
+                    qInfo() << "  - Sensors: ON (monitoring)";
+                    qInfo() << "  - MQTT: ON (listening)";
+                    qInfo() << "  - Window Control: ON (manual only)";
+                    qInfo() << "========================================";
+                }
+            }
+            else if (command == "open") {
+                bool status = data["status"].toBool();
+                qInfo() << ">>> Open command received! Status:" << (status ? "OPEN" : "CLOSED");
+
+                // Control window via Bluetooth
+                if (status) {
+                    windowController->openWindow();
+                    qInfo() << "  → Opening window (100%)";
+                } else {
+                    windowController->closeWindow();
+                    qInfo() << "  → Closing window (0%)";
+                }
+            }
+            else if (command == "mode") {
+                QString mode = data["mode"].toString();
+                qInfo() << ">>> Mode command received! Mode:" << mode;
+
+                // ========================================
+                // Mode Mapping & PDLC Control
+                // ========================================
+                // Backend modes → Lumiscape screens + PDLC control
+                // AUTO_MODE   → auto     (PDLC: Opaque)
+                // DARK_MODE   → privacy  (PDLC: Opaque) [temporary mapping]
+                // SLEEP_MODE  → glass    (PDLC: Transparent) [temporary mapping]
+                // CUSTOM_MODE → custom   (PDLC: Opaque)
+                // ========================================
+
+                if (mode == "AUTO_MODE") {
+                    // Auto Mode: PDLC OFF (Opaque)
+                    pdlcController->setOpaque();
+                    router.navigateTo("auto");
+                    qInfo() << "  → Auto Mode: PDLC Opaque, navigating to 'auto' screen";
+                }
+                else if (mode == "DARK_MODE") {
+                    // Privacy Mode: PDLC OFF (Opaque)
+                    // Temporary mapping: DARK_MODE → Privacy
+                    pdlcController->setOpaque();
+                    router.navigateTo("privacy");
+                    qInfo() << "  → Privacy Mode: PDLC Opaque, navigating to 'privacy' screen";
+                }
+                else if (mode == "SLEEP_MODE") {
+                    // Glass Mode: PDLC ON (Transparent)
+                    // Temporary mapping: SLEEP_MODE → Glass
+                    pdlcController->setTransparent();
+                    router.navigateTo("glass");
+                    qInfo() << "  → Glass Mode: PDLC Transparent, navigating to 'glass' screen";
+                }
+                else if (mode == "CUSTOM_MODE") {
+                    // Custom Mode: PDLC OFF (Opaque)
+                    pdlcController->setOpaque();
+                    router.navigateTo("custom");
+                    qInfo() << "  → Custom Mode: PDLC Opaque, navigating to 'custom' screen";
+                }
+                else {
+                    qWarning() << "  → Unknown mode:" << mode;
+                }
+            }
+            else if (command == "media") {
+                qInfo() << ">>> Media command received!";
+                qInfo() << "    Media ID:" << data["mediaId"].toLongLong();
+                QString mediaUrl = data["mediaUrl"].toString();
+                qInfo() << "    Media URL:" << mediaUrl;
+
+                // Update current media URL in config
+                config.setCurrentMediaUrl(mediaUrl);
+
+                // Auto navigate to custom mode to show the media
+                router.navigateTo("custom");
+            }
+            else if (command == "music") {
+                qInfo() << ">>> Music command received!";
+                qInfo() << "    Music ID:" << data["musicId"].toLongLong();
+                QString musicUrl = data["musicUrl"].toString();
+                qInfo() << "    Music URL:" << musicUrl;
+
+                // Update current YouTube URL in config
+                config.setCurrentYoutubeUrl(musicUrl);
+
+                // Auto navigate to custom mode to play the music
+                router.navigateTo("custom");
+            }
+        }
+    });
+
+    // Connection status handler
+    QObject::connect(&mqttClient, &MqttClient::connectionStateChanged,
+                     [&config](bool connected) {
+        if (connected) {
+            qInfo() << "✓ MQTT Connected successfully!";
+        } else {
+            qWarning() << "✗ MQTT Disconnected";
+        }
+    });
+
+    // Error handler
+    QObject::connect(&mqttClient, &MqttClient::errorOccurred,
+                     [](const QString &error) {
+        qCritical() << "MQTT Error:" << error;
+    });
 
     // REST client for external APIs
     RestClient restClient;
@@ -78,6 +278,7 @@ int main(int argc, char *argv[])
     auto clockProvider = new ClockProvider(&app);
     auto weatherProvider = new WeatherProvider(&restClient, &app);
     auto spotifyProvider = new SpotifyProvider(&restClient, &app);
+    // auto youtubeProvider = new YouTubeProvider(&app);  // Removed: using WebEngine-based QML player
     auto spotifyAuthHelper = new SpotifyAuthHelper(&restClient, &app);
 
     // Initialize WeatherProvider with API key and default city
@@ -106,6 +307,38 @@ int main(int argc, char *argv[])
     widgetRegistry.registerWidget("clock", clockProvider);
     widgetRegistry.registerWidget("weather", weatherProvider);
     widgetRegistry.registerWidget("spotify", spotifyProvider);
+    // widgetRegistry.registerWidget("youtube", youtubeProvider);  // Removed: using WebEngine-based QML player
+
+    // Sensor manager for environmental monitoring
+    auto sensorManager = new SensorManager(&app);
+    widgetRegistry.registerWidget("sensor", sensorManager);
+
+    // Publish sensor data to MQTT when values change
+    auto publishSensorData = [&mqttClient, &config, sensorManager]() {
+        if (!mqttClient.isConnected()) {
+            return;
+        }
+
+        QString deviceId = config.deviceUniqueId();
+        QString sensorTopic = QString("/devices/%1/status/sensor").arg(deviceId);
+
+        QVariantMap sensorData;
+        sensorData["co2"] = sensorManager->co2();
+        sensorData["pm25"] = sensorManager->pm25();
+        sensorData["pm10"] = sensorManager->pm10();
+        sensorData["temperature"] = sensorManager->temperature();
+        sensorData["humidity"] = sensorManager->humidity();
+
+        mqttClient.publishJson(sensorTopic, sensorData, 1);
+        qInfo() << "Published sensor data to" << sensorTopic << ":" << sensorData;
+    };
+
+    // Connect sensor signals to MQTT publish
+    QObject::connect(sensorManager, &SensorManager::co2Changed, publishSensorData);
+    QObject::connect(sensorManager, &SensorManager::pm25Changed, publishSensorData);
+    QObject::connect(sensorManager, &SensorManager::pm10Changed, publishSensorData);
+    QObject::connect(sensorManager, &SensorManager::temperatureChanged, publishSensorData);
+    QObject::connect(sensorManager, &SensorManager::humidityChanged, publishSensorData);
 
     // ========================================================================
     // QML Engine Setup
@@ -126,7 +359,11 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("clockProvider", clockProvider);
     engine.rootContext()->setContextProperty("weatherProvider", weatherProvider);
     engine.rootContext()->setContextProperty("spotifyProvider", spotifyProvider);
+    // engine.rootContext()->setContextProperty("youtubeProvider", youtubeProvider);  // Removed
     engine.rootContext()->setContextProperty("spotifyAuthHelper", spotifyAuthHelper);
+    engine.rootContext()->setContextProperty("sensorManager", sensorManager);
+    engine.rootContext()->setContextProperty("pdlcController", pdlcController);
+    engine.rootContext()->setContextProperty("windowController", windowController);
 
     // Error handling
     QObject::connect(
@@ -150,6 +387,37 @@ int main(int argc, char *argv[])
 
     // Start MediaPipe gesture recognition
     mediaPipeClient.start();
+
+    // Subscribe to backend command topics
+    // Topic pattern: /devices/{deviceUniqueId}/command/#
+    QString deviceId = config.deviceUniqueId();
+    QString commandTopic = QString("/devices/%1/command/#").arg(deviceId);
+
+    // Wait a bit for MQTT connection to establish, then subscribe
+    QTimer::singleShot(2000, [&mqttClient, commandTopic, deviceId]() {
+        if (mqttClient.isConnected()) {
+            mqttClient.subscribe(commandTopic, 1);
+            qInfo() << "========================================";
+            qInfo() << "Device ID:" << deviceId;
+            qInfo() << "Subscribed to backend commands:" << commandTopic;
+            qInfo() << "========================================";
+        } else {
+            qWarning() << "MQTT not connected yet, will retry subscription...";
+            // The auto-reconnect will handle this
+        }
+    });
+
+    // Also subscribe when connection is established (for reconnection scenarios)
+    QObject::connect(&mqttClient, &MqttClient::connectionStateChanged,
+                     [&mqttClient, commandTopic, deviceId](bool connected) {
+        if (connected) {
+            mqttClient.subscribe(commandTopic, 1);
+            qInfo() << "Device" << deviceId << "subscribed to:" << commandTopic;
+        }
+    });
+
+    // YouTube control is now handled directly in QML via WebEngine
+    // (legacy MQTT topics removed)
 
     // Navigate to loading screen
     router.navigateTo("loading");

@@ -105,6 +105,24 @@ void AppConfig::setGestureEnabled(bool enabled)
     }
 }
 
+void AppConfig::setCurrentMediaUrl(const QString &url)
+{
+    if (m_currentMediaUrl != url) {
+        m_currentMediaUrl = url;
+        emit currentMediaUrlChanged();
+        qInfo() << "Media URL updated:" << url;
+    }
+}
+
+void AppConfig::setCurrentYoutubeUrl(const QString &url)
+{
+    if (m_currentYoutubeUrl != url) {
+        m_currentYoutubeUrl = url;
+        emit currentYoutubeUrlChanged();
+        qInfo() << "YouTube URL updated:" << url;
+    }
+}
+
 QString AppConfig::applicationDirPath() const
 {
     return QCoreApplication::applicationDirPath();
@@ -146,11 +164,17 @@ void AppConfig::parseJson(const QJsonObject &json)
         m_gestureEnabled = json["gestureEnabled"].toBool();
     }
 
+    // Device settings
+    if (json.contains("deviceUniqueId")) {
+        m_deviceUniqueId = json["deviceUniqueId"].toString();
+    }
+
     // MQTT settings
     if (json.contains("mqtt")) {
         QJsonObject mqtt = json["mqtt"].toObject();
         if (mqtt.contains("host")) m_mqttHost = mqtt["host"].toString();
         if (mqtt.contains("port")) m_mqttPort = mqtt["port"].toInt();
+        if (mqtt.contains("useTls")) m_mqttUseTls = mqtt["useTls"].toBool();
         if (mqtt.contains("username")) m_mqttUsername = mqtt["username"].toString();
         if (mqtt.contains("password")) m_mqttPassword = mqtt["password"].toString();
     }

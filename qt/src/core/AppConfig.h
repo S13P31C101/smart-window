@@ -18,11 +18,15 @@ class AppConfig : public QObject
     Q_PROPERTY(int screenHeight READ screenHeight NOTIFY configChanged)
     Q_PROPERTY(QString theme READ theme NOTIFY configChanged)
     Q_PROPERTY(bool gestureEnabled READ gestureEnabled WRITE setGestureEnabled NOTIFY gestureEnabledChanged)
+    Q_PROPERTY(QString deviceUniqueId READ deviceUniqueId NOTIFY configChanged)
     Q_PROPERTY(QString mqttHost READ mqttHost NOTIFY configChanged)
     Q_PROPERTY(int mqttPort READ mqttPort NOTIFY configChanged)
+    Q_PROPERTY(bool mqttUseTls READ mqttUseTls NOTIFY configChanged)
     Q_PROPERTY(QString weatherApiKey READ weatherApiKey NOTIFY configChanged)
     Q_PROPERTY(QString spotifyClientId READ spotifyClientId NOTIFY configChanged)
     Q_PROPERTY(QString applicationDirPath READ applicationDirPath CONSTANT)
+    Q_PROPERTY(QString currentMediaUrl READ currentMediaUrl WRITE setCurrentMediaUrl NOTIFY currentMediaUrlChanged)
+    Q_PROPERTY(QString currentYoutubeUrl READ currentYoutubeUrl WRITE setCurrentYoutubeUrl NOTIFY currentYoutubeUrlChanged)
 
 public:
     explicit AppConfig(QObject *parent = nullptr);
@@ -53,8 +57,10 @@ public:
     QString theme() const { return m_theme; }
     bool gestureEnabled() const { return m_gestureEnabled; }
 
+    QString deviceUniqueId() const { return m_deviceUniqueId; }
     QString mqttHost() const { return m_mqttHost; }
     int mqttPort() const { return m_mqttPort; }
+    bool mqttUseTls() const { return m_mqttUseTls; }
     QString mqttUsername() const { return m_mqttUsername; }
     QString mqttPassword() const { return m_mqttPassword; }
 
@@ -67,12 +73,19 @@ public:
 
     QString applicationDirPath() const;
 
+    QString currentMediaUrl() const { return m_currentMediaUrl; }
+    QString currentYoutubeUrl() const { return m_currentYoutubeUrl; }
+
     // Setters
     void setGestureEnabled(bool enabled);
+    void setCurrentMediaUrl(const QString &url);
+    void setCurrentYoutubeUrl(const QString &url);
 
 signals:
     void configChanged();
     void gestureEnabledChanged();
+    void currentMediaUrlChanged();
+    void currentYoutubeUrlChanged();
     void loadingProgress(int percentage, const QString &message);
 
 private:
@@ -85,9 +98,13 @@ private:
     QString m_theme{"dark"};
     bool m_gestureEnabled{true};
 
+    // Device settings
+    QString m_deviceUniqueId{"lumiscape_default"};
+
     // MQTT settings
     QString m_mqttHost{"localhost"};
     int m_mqttPort{1883};
+    bool m_mqttUseTls{false};
     QString m_mqttUsername;
     QString m_mqttPassword;
 
@@ -103,4 +120,8 @@ private:
     // System paths
     QString m_assetsPath{"assets"};
     QString m_pythonScriptPath{"python/mediapipe_gesture_service.py"};
+
+    // Media
+    QString m_currentMediaUrl;
+    QString m_currentYoutubeUrl;
 };
