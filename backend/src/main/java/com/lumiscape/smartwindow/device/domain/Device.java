@@ -2,6 +2,7 @@ package com.lumiscape.smartwindow.device.domain;
 
 import com.lumiscape.smartwindow.alarm.domain.Alarm;
 import com.lumiscape.smartwindow.media.domain.Media;
+import com.lumiscape.smartwindow.music.domain.Music;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 
 import jakarta.persistence.*;
@@ -56,6 +57,10 @@ public class Device {
     @JoinColumn(name = "media_id")
     private Media media;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "music_id")
+    private Music music;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -88,6 +93,9 @@ public class Device {
     }
     public void updateMedia(Media media) {
         this.media = media;
+    }
+    public void updateMusic(Music music) {
+        this.music = music;
     }
 
 }

@@ -122,6 +122,15 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
+    @PatchMapping("/{device-id}/music")
+    public ApiResponse<DeviceDetailResponse> updateDeviceMusic(@AuthenticationPrincipal Long userId,
+                                                               @PathVariable("device-id") Long deviceId,
+                                                               @RequestBody DeviceMusicRequest request) {
+        DeviceDetailResponse response = deviceService.updateDeviceMusic(userId, deviceId, request.musicId());
+
+        return ApiResponse.onSuccess(response);
+    }
+
     @GetMapping("/{device-id}/alarms")
     public ApiResponse<List<AlarmResponse>> getAlarmsByDevice(@AuthenticationPrincipal Long userId,
                                                               @PathVariable("device-id") Long deviceId) {
