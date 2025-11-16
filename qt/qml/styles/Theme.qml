@@ -15,6 +15,10 @@ QtObject {
     readonly property color accent: "#60a5fa"       // blue-400
     readonly property color accentLight: "#93c5fd"  // blue-300
 
+    // Alpha variants for cursor and effects
+    readonly property color primaryAlpha60: Qt.rgba(0.133, 0.827, 0.933, 0.6)  // primary with 60% opacity
+    readonly property color whiteAlpha60: Qt.rgba(1, 1, 1, 0.6)
+
     // Background colors (Slate Dark theme)
     readonly property color backgroundDark: "#020617"   // slate-950
     readonly property color backgroundMid: "#0f172a"    // slate-900
@@ -155,8 +159,10 @@ QtObject {
     // Helper Functions
     // ========================================================================
 
-    function alpha(color, opacity) {
-        return Qt.rgba(color.r, color.g, color.b, opacity)
+    function alpha(colorValue, opacity) {
+        // Convert to color if string, then extract RGBA
+        var c = Qt.color ? Qt.color(colorValue) : colorValue
+        return Qt.rgba(c.r, c.g, c.b, opacity)
     }
 
     function lighten(color, factor) {

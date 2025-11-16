@@ -297,6 +297,192 @@ Item {
         }
     }
 
+    // ====== 제어 버튼 (모드 선택 밑) ======
+    Row {
+        id: controlButtons
+        spacing: root.width * 0.02
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: gridContainer.bottom
+        anchors.topMargin: root.height * 0.04
+
+        // Power OFF 버튼
+        Rectangle {
+            width: root.width * 0.22
+            height: root.height * 0.045
+            radius: 12
+            color: "#ef4444" // red
+            border.color: "#dc2626"
+            border.width: 2
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowOpacity: 0.2
+                shadowBlur: 0.5
+                shadowColor: "#000000"
+            }
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: "⏻"
+                    color: "white"
+                    font.pixelSize: parent.parent.height * 0.45
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: "Power OFF"
+                    color: "white"
+                    font.pixelSize: parent.parent.height * 0.35
+                    font.weight: Font.Bold
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    var topic = "/devices/" + appConfig.deviceUniqueId + "/command/power"
+                    var payload = { "status": false }
+                    mqttClient.publishJson(topic, payload, 1)
+                    console.log("📤 Power OFF →", topic, payload)
+                }
+            }
+
+            scale: controlMa1.pressed ? 0.95 : (controlMa1.containsMouse ? 1.05 : 1.0)
+            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+            MouseArea {
+                id: controlMa1
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: parent.children[2].clicked()
+            }
+        }
+
+        // Open Window 버튼
+        Rectangle {
+            width: root.width * 0.22
+            height: root.height * 0.045
+            radius: 12
+            color: "#3b82f6" // blue
+            border.color: "#2563eb"
+            border.width: 2
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowOpacity: 0.2
+                shadowBlur: 0.5
+                shadowColor: "#000000"
+            }
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: "🪟"
+                    color: "white"
+                    font.pixelSize: parent.parent.height * 0.45
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: "Open"
+                    color: "white"
+                    font.pixelSize: parent.parent.height * 0.35
+                    font.weight: Font.Bold
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    var topic = "/devices/" + appConfig.deviceUniqueId + "/command/open"
+                    var payload = { "status": true }
+                    mqttClient.publishJson(topic, payload, 1)
+                    console.log("📤 Open Window →", topic, payload)
+                }
+            }
+
+            scale: controlMa2.pressed ? 0.95 : (controlMa2.containsMouse ? 1.05 : 1.0)
+            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+            MouseArea {
+                id: controlMa2
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: parent.children[2].clicked()
+            }
+        }
+
+        // Close Window 버튼
+        Rectangle {
+            width: root.width * 0.22
+            height: root.height * 0.045
+            radius: 12
+            color: "#f59e0b" // amber
+            border.color: "#d97706"
+            border.width: 2
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowOpacity: 0.2
+                shadowBlur: 0.5
+                shadowColor: "#000000"
+            }
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: "🪟"
+                    color: "white"
+                    font.pixelSize: parent.parent.height * 0.45
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: "Close"
+                    color: "white"
+                    font.pixelSize: parent.parent.height * 0.35
+                    font.weight: Font.Bold
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    var topic = "/devices/" + appConfig.deviceUniqueId + "/command/open"
+                    var payload = { "status": false }
+                    mqttClient.publishJson(topic, payload, 1)
+                    console.log("📤 Close Window →", topic, payload)
+                }
+            }
+
+            scale: controlMa3.pressed ? 0.95 : (controlMa3.containsMouse ? 1.05 : 1.0)
+            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+            MouseArea {
+                id: controlMa3
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: parent.children[2].clicked()
+            }
+        }
+    }
+
     // ====== 하단 힌트 (반응형) ======
     Row {
         id: hintRow

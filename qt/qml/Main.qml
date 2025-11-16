@@ -21,7 +21,7 @@ ApplicationWindow {
     // ========================================================================
 
     background: Rectangle {
-        color: Theme.backgroundDark
+        color: "#020617"  // slate-950
     }
 
     // ========================================================================
@@ -42,6 +42,7 @@ ApplicationWindow {
                 case "glass": return "screens/GlassModeScreen.qml"
                 case "privacy": return "screens/PrivacyModeScreen.qml"
                 case "auto": return "screens/AutoModeScreen.qml"
+                case "standby": return "screens/StandbyScreen.qml"
                 default: return "screens/LoadingScreen.qml"
             }
         }
@@ -63,13 +64,14 @@ ApplicationWindow {
 
     GestureCursor {
         id: gestureCursor
-        // 메뉴 화면에서는 숨김 (MenuScreen이 자체 커서 사용)
-        // 다른 화면에서는 3초 후 자동 숨김
+        z: 1000  // Ensure cursor is always on top
+
+        // Show cursor when hand is detected in the 4 modes (Auto, Privacy, Glass, Custom)
         visible: gestureBridge.handDetected &&
                  appConfig.gestureEnabled &&
                  router.currentScreen !== "menu" &&
                  router.currentScreen !== "loading" &&
-                 cursorAutoHideTimer.showCursor
+                 router.currentScreen !== "standby"
 
         x: gestureBridge.cursorX * parent.width - width / 2
         y: gestureBridge.cursorY * parent.height - height / 2
@@ -94,29 +96,6 @@ ApplicationWindow {
 
         Behavior on opacity {
             NumberAnimation { duration: 300 }
-        }
-    }
-
-    // 커서 자동 숨김 타이머
-    Timer {
-        id: cursorAutoHideTimer
-        interval: 3000  // 3초
-        repeat: false
-        property bool showCursor: true
-
-        onTriggered: {
-            showCursor = false
-        }
-    }
-
-    // 커서 움직임 감지 (다시 표시)
-    Connections {
-        target: gestureBridge
-        function onCursorPositionChanged() {
-            if (router.currentScreen !== "menu" && router.currentScreen !== "loading") {
-                cursorAutoHideTimer.showCursor = true
-                cursorAutoHideTimer.restart()
-            }
         }
     }
 
@@ -159,35 +138,35 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 30
-        color: Theme.alpha(Theme.backgroundDark, 0.8)
+        color: Qt.rgba(0.008, 0.024, 0.090, 0.8)  // backgroundDark with 80% opacity
         visible: false  // Set to true for debugging
 
         Row {
             anchors.fill: parent
-            anchors.margins: Theme.spacingS
-            spacing: Theme.spacingM
+            anchors.margins: 8
+            spacing: 16
 
             Text {
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall
+                color: "#94a3b8"  // slate-400
+                font.pixelSize: 12
                 text: "Screen: " + router.currentScreen
             }
 
             Text {
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall
+                color: "#94a3b8"  // slate-400
+                font.pixelSize: 12
                 text: "Gesture: " + gestureBridge.currentGesture
             }
 
             Text {
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall
+                color: "#94a3b8"  // slate-400
+                font.pixelSize: 12
                 text: "Hand: " + (gestureBridge.handDetected ? "Detected" : "None")
             }
 
             Text {
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontSizeSmall
+                color: "#94a3b8"  // slate-400
+                font.pixelSize: 12
                 text: "Time: " + clockProvider.timeString
             }
         }
@@ -198,8 +177,7 @@ ApplicationWindow {
     // ========================================================================
 
     Component.onCompleted: {
-        console.log("Lumiscape initialized")
-        console.log("Screen:", width + "x" + height)
+        // Initialization complete
     }
 
     // ========================================================================
@@ -209,14 +187,13 @@ ApplicationWindow {
     Connections {
         target: router
         function onScreenChanged(screen, params) {
-            console.log("Screen changed to:", screen)
+            // Screen navigation handled
         }
     }
 
     Connections {
         target: gestureBridge
         function onFistDetected() {
-            console.log("Fist gesture detected")
             // Handle global fist gesture (e.g., click)
         }
     }
