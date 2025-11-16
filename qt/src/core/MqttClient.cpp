@@ -3,6 +3,7 @@
 #include <QJsonObject>
 #include <QDebug>
 #include <QTimer>
+#include <QSslSocket>
 
 MqttClient::MqttClient(QObject *parent)
     : QObject(parent)
@@ -24,14 +25,15 @@ MqttClient::MqttClient(QObject *parent)
 }
 
 void MqttClient::connectToHost(const QString &host, quint16 port,
-                               const QString &username, const QString &password)
+                               const QString &username, const QString &password,
+                               bool useTls)
 {
     if (m_client->state() == QMqttClient::Connected) {
         qWarning() << "Already connected to MQTT broker";
         return;
     }
 
-    qInfo() << "Connecting to MQTT broker:" << host << ":" << port;
+    qInfo() << "Connecting to MQTT broker:" << host << ":" << port << "(TLS:" << useTls << ")";
     setStatus("Connecting...");
 
     m_client->setHostname(host);
@@ -44,7 +46,19 @@ void MqttClient::connectToHost(const QString &host, quint16 port,
         m_client->setPassword(password);
     }
 
-    m_client->connectToHost();
+    // Configure TLS/SSL if requested
+    if (useTls) {
+        QSslSocket sslSocket;
+        QSslConfiguration sslConfig = sslSocket.sslConfiguration();
+        sslConfig.setPeerVerifyMode(QSslSocket::VerifyNone);  // For self-signed certificates
+        sslConfig.setProtocol(QSsl::TlsV1_2OrLater);
+
+        m_client->connectToHostEncrypted(sslConfig);
+        qInfo() << "Using encrypted MQTT connection (MQTTS)";
+    } else {
+        m_client->connectToHost();
+        qInfo() << "Using plain MQTT connection";
+    }
 }
 
 void MqttClient::disconnect()

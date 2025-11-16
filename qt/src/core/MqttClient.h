@@ -29,11 +29,13 @@ public:
      * @param port Broker port (default: 1883)
      * @param username Optional username
      * @param password Optional password
+     * @param useTls Use TLS/SSL encryption (default: false)
      */
     Q_INVOKABLE void connectToHost(const QString &host,
                                    quint16 port = 1883,
                                    const QString &username = QString(),
-                                   const QString &password = QString());
+                                   const QString &password = QString(),
+                                   bool useTls = false);
 
     /**
      * @brief Disconnect from broker

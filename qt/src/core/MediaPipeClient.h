@@ -41,6 +41,12 @@ public:
     Q_INVOKABLE void restart();
 
     /**
+     * @brief Enable or disable auto-restart
+     * @param enable true to enable auto-restart, false to disable
+     */
+    Q_INVOKABLE void setAutoRestart(bool enable);
+
+    /**
      * @brief Check if service is running
      */
     bool isRunning() const;

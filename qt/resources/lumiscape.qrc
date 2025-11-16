@@ -10,12 +10,15 @@
         <file>../qml/screens/GlassModeScreen.qml</file>
         <file>../qml/screens/PrivacyModeScreen.qml</file>
         <file>../qml/screens/AutoModeScreen.qml</file>
+        <file>../qml/screens/StandbyScreen.qml</file>
 
         <!-- Components -->
         <file>../qml/components/GestureCursor.qml</file>
+        <file>../qml/components/GestureControlledUI.qml</file>
         <file>../qml/components/RadialMenu.qml</file>
         <file>../qml/components/AmbientGlow.qml</file>
         <file>../qml/components/GlassCard.qml</file>
+        <file>../qml/components/MinimalButton.qml</file>
 
         <!-- Widgets -->
         <file>../qml/widgets/ClockWidget.qml</file>

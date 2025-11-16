@@ -83,6 +83,12 @@ void MediaPipeClient::restart()
     start(m_pythonPath, m_scriptPath);
 }
 
+void MediaPipeClient::setAutoRestart(bool enable)
+{
+    m_autoRestart = enable;
+    qInfo() << "MediaPipe auto-restart:" << (enable ? "ENABLED" : "DISABLED");
+}
+
 bool MediaPipeClient::isRunning() const
 {
     return m_process && m_process->state() == QProcess::Running;
