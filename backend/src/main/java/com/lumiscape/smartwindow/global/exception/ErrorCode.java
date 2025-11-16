@@ -24,7 +24,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-01", "사용자를 찾을 수 없습니다."),
     DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-02", "디바이스를 찾을 수 없습니다."),
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-03", "이미지를 찾을 수 없습니다."),
-    VIDEO_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-04", "동영상을 찾을 수 없습니다."),
+    MUSIC_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-04", "음악을 찾을 수 없습니다."),
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-05", "알람을 찾을 수 없습니다."),
 
     // 409 Conflict

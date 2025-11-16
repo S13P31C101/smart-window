@@ -11,6 +11,8 @@ import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.service.MediaService;
+import com.lumiscape.smartwindow.music.domain.Music;
+import com.lumiscape.smartwindow.music.service.MusicService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 
 import com.lumiscape.smartwindow.user.service.UserService;
@@ -37,10 +39,16 @@ public class DeviceService {
     private final MqttPublishService mqttPublishService;
 
     private MediaService mediaService;
+    private MusicService musicService;
 
     @Autowired
     public void setMediaService(@Lazy MediaService mediaService) {
         this.mediaService = mediaService;
+    }
+
+    @Autowired
+    public void setMusicService(@Lazy MusicService musicService) {
+        this.musicService = musicService;
     }
 
     public List<DeviceDetailResponse> getMyDevice(Long userId) {
@@ -166,6 +174,22 @@ public class DeviceService {
     }
 
     @Transactional
+    public DeviceDetailResponse updateDeviceMusic(Long userId, Long deviceId, Long musicId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        Music music = null;
+        if (musicId != null) {
+            music = musicService.findMusicByUser(musicId, userId);
+        }
+
+        device.updateMusic(music);
+
+        publishMusicUpdateToDevice(device);
+
+        return DeviceDetailResponse.from(device);
+    }
+
+    @Transactional
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
@@ -218,5 +242,21 @@ public class DeviceService {
         Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
 
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
+    }
+
+    public void publishMusicUpdateToDevice(Device device) {
+        Music music = device.getMusic();
+
+        Long musicId = null;
+        String musicUrl = null;
+
+        if (music != null) {
+            musicId = music.getId();
+            musicUrl = music.getMusicUrl();
+        }
+
+        Map<String, Object> payload = Map.of("musicId", musicId, "musicUrl", musicUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
 }
