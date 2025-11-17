@@ -146,7 +146,7 @@ async def notify_ai_callback(media_id: int, target_s3_key: str):
     timeout = httpx.Timeout(30.0, read=30.0)
     headers = {"X-AI-Token": AI_TOKEN}
     callback_payload = {
-        "parentMediaId": str(media_id),
+        "parentMediaId": media_id,
         "s3ObjectKey": target_s3_key,
         "fileType": "IMAGE"
     }
