@@ -77,8 +77,11 @@ set(PROJECT_SOURCES
     src/widgets/ClockProvider.cpp
     src/widgets/WeatherProvider.h
     src/widgets/WeatherProvider.cpp
-    src/widgets/SpotifyProvider.h
-    src/widgets/SpotifyProvider.cpp
+    # Spotify removed - using YouTube for background music
+    # src/widgets/SpotifyProvider.h
+    # src/widgets/SpotifyProvider.cpp
+    # src/widgets/SpotifyWebBridge.h
+    # src/widgets/SpotifyWebBridge.cpp
     src/widgets/YouTubeProvider.h
     src/widgets/YouTubeProvider.cpp
     src/widgets/SensorManager.h
@@ -93,8 +96,9 @@ set(PROJECT_SOURCES
     src/hardware/WindowController.cpp
 
     # Integrations
-    src/integrations/SpotifyAuthHelper.h
-    src/integrations/SpotifyAuthHelper.cpp
+    # Spotify removed - using YouTube for background music
+    # src/integrations/SpotifyAuthHelper.h
+    # src/integrations/SpotifyAuthHelper.cpp
 )
 
 # ============================================================================
@@ -125,7 +129,9 @@ set(PROJECT_QML_FILES
     # Widgets
     qml/widgets/ClockWidget.qml
     qml/widgets/WeatherWidget.qml
-    qml/widgets/SpotifyWidget.qml
+    # Spotify removed - using YouTube for background music
+    # qml/widgets/SpotifyWidget.qml
+    # qml/widgets/SpotifyWebPlayer.qml
     qml/widgets/YouTubePlayer.qml
     qml/widgets/QuoteWidget.qml
 

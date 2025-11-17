@@ -316,14 +316,14 @@ Item {
         ClockWidget {
             id: clockWidget
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: widgetRegistry.isWidgetActive("clock")
+            visible: true
         }
 
         // 날씨 위젯
         WeatherWidget {
             id: weatherWidget
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: widgetRegistry.isWidgetActive("weather")
+            visible: true
         }
 
         // 명언 위젯 (날씨 바로 밑)
@@ -342,22 +342,15 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: parent.height * 0.05
-        width: Math.min(parent.width * 0.5, 500)
-        height: 220
+        width: Math.min(parent.width * 0.45, 500)  // Compact size
+        height: 160
         youtubeUrl: root.currentYoutubeUrl
         visible: root.currentYoutubeUrl !== ""
         z: 60  // Above all other widgets to prevent being covered by background
     }
 
-    // ====== 하단 위젯 영역 (Spotify - YouTube와 겹치지 않도록 조정) ======
-    SpotifyWidget {
-        id: spotifyWidget
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.08
-        visible: widgetRegistry.isWidgetActive("spotify") && !youtubePlayer.visible
-        z: 60  // Above all other widgets to prevent being covered by background
-    }
+    // Spotify removed - using YouTube player for music
+    // CustomModeScreen uses MQTT-controlled YouTube player only
 
     // Back button - Gesture controlled and vertically centered
     GestureControlledUI {

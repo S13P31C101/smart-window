@@ -17,12 +17,14 @@
 #include "widgets/WidgetRegistry.h"
 #include "widgets/ClockProvider.h"
 #include "widgets/WeatherProvider.h"
-#include "widgets/SpotifyProvider.h"
+// Spotify removed - using YouTube for background music
+// #include "widgets/SpotifyProvider.h"
+// #include "widgets/SpotifyWebBridge.h"
+// #include "integrations/SpotifyAuthHelper.h"
 // #include "widgets/YouTubeProvider.h"  // Removed: using WebEngine-based QML player instead
 #include "widgets/SensorManager.h"
 #include "hardware/PDLCController.h"
 #include "hardware/WindowController.h"
-#include "integrations/SpotifyAuthHelper.h"
 
 int main(int argc, char *argv[])
 {
@@ -348,36 +350,43 @@ int main(int argc, char *argv[])
     // Register widget providers
     auto clockProvider = new ClockProvider(&app);
     auto weatherProvider = new WeatherProvider(&restClient, &app);
-    auto spotifyProvider = new SpotifyProvider(&restClient, &app);
+    // Spotify removed - using YouTube for background music
+    // auto spotifyProvider = new SpotifyProvider(&restClient, &app);
+    // auto spotifyWebBridge = new SpotifyWebBridge(&app);
+    // auto spotifyAuthHelper = new SpotifyAuthHelper(&restClient, &app);
     // auto youtubeProvider = new YouTubeProvider(&app);  // Removed: using WebEngine-based QML player
-    auto spotifyAuthHelper = new SpotifyAuthHelper(&restClient, &app);
 
     // Initialize WeatherProvider with API key and default city
     weatherProvider->setApiKey(config.weatherApiKey());
     weatherProvider->setCity("Seoul");
     qInfo() << "WeatherProvider initialized with API key";
 
+    // Spotify removed - using YouTube for background music
+    /*
     // Initialize SpotifyAuthHelper with config
     spotifyAuthHelper->initAuth(
         config.spotifyClientId(),
         config.spotifyRedirectUri(),
-        "user-read-playback-state user-modify-playback-state user-read-currently-playing"
+        "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing"
     );
 
-    // Connect SpotifyAuthHelper to SpotifyProvider
+    // Connect SpotifyAuthHelper to SpotifyProvider and SpotifyWebBridge
     QObject::connect(spotifyAuthHelper, &SpotifyAuthHelper::accessTokenReceived,
-                     spotifyProvider, [spotifyProvider](const QString &token, int expiresIn) {
+                     spotifyProvider, [spotifyProvider, spotifyWebBridge](const QString &token, int expiresIn) {
         Q_UNUSED(expiresIn)
         spotifyProvider->setAccessToken(token);
-        qInfo() << "Spotify access token set";
+        spotifyWebBridge->setAccessToken(token);
+        qInfo() << "Spotify access token set for provider and web bridge";
     });
 
     // Try to restore authentication from saved tokens
     spotifyAuthHelper->restoreAuthentication();
+    */
 
     widgetRegistry.registerWidget("clock", clockProvider);
     widgetRegistry.registerWidget("weather", weatherProvider);
-    widgetRegistry.registerWidget("spotify", spotifyProvider);
+    // Spotify removed - using YouTube for background music
+    // widgetRegistry.registerWidget("spotify", spotifyProvider);
     // widgetRegistry.registerWidget("youtube", youtubeProvider);  // Removed: using WebEngine-based QML player
 
     // Sensor manager for environmental monitoring
@@ -430,9 +439,11 @@ int main(int argc, char *argv[])
     // Individual widget providers for direct access
     engine.rootContext()->setContextProperty("clockProvider", clockProvider);
     engine.rootContext()->setContextProperty("weatherProvider", weatherProvider);
-    engine.rootContext()->setContextProperty("spotifyProvider", spotifyProvider);
+    // Spotify removed - using YouTube for background music
+    // engine.rootContext()->setContextProperty("spotifyProvider", spotifyProvider);
+    // engine.rootContext()->setContextProperty("spotifyWebBridge", spotifyWebBridge);
+    // engine.rootContext()->setContextProperty("spotifyAuthHelper", spotifyAuthHelper);
     // engine.rootContext()->setContextProperty("youtubeProvider", youtubeProvider);  // Removed
-    engine.rootContext()->setContextProperty("spotifyAuthHelper", spotifyAuthHelper);
     engine.rootContext()->setContextProperty("sensorManager", sensorManager);
     engine.rootContext()->setContextProperty("pdlcController", pdlcController);
     engine.rootContext()->setContextProperty("windowController", windowController);

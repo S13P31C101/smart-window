@@ -25,6 +25,9 @@ Item {
     // 비디오 모드 토글
     property bool isVideoMode: false
 
+    // Background music URL based on current location
+    property string currentBackgroundMusicUrl: ""
+
     // 초기화: 랜덤 장소 선택
     Component.onCompleted: {
         selectRandomLocation()
@@ -45,6 +48,26 @@ Item {
         }
 
         backgroundImage.source = getSceneImage()
+        updateBackgroundMusic()
+    }
+
+    // Update background music based on current location
+    function updateBackgroundMusic() {
+        if (!currentLocation) {
+            currentBackgroundMusicUrl = ""
+            return
+        }
+
+        var musicMap = appConfig.autoModeBackgroundMusic
+        var locationKey = currentLocation.display
+
+        if (musicMap && musicMap[locationKey]) {
+            currentBackgroundMusicUrl = musicMap[locationKey]
+            console.log("🎵 Background music for", locationKey, ":", currentBackgroundMusicUrl)
+        } else {
+            currentBackgroundMusicUrl = ""
+            console.log("⚠️ No background music configured for", locationKey)
+        }
     }
 
     // 다른 장소로 변경
@@ -71,6 +94,9 @@ Item {
             if (isVideoMode) {
                 backgroundVideo.source = getSceneVideo()
             }
+
+            // Update background music
+            updateBackgroundMusic()
         }
     }
 
@@ -240,12 +266,22 @@ Item {
         }
     }
 
-    // ========== 하단 Spotify 위젯 ==========
-    SpotifyWidget {
+    // ========== 하단 YouTube Background Music ==========
+    YouTubePlayer {
+        id: youtubePlayer
+        youtubeUrl: root.currentBackgroundMusicUrl
+
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: changeViewButton.top
         anchors.bottomMargin: parent.height * 0.03
-        visible: spotifyProvider.authenticated
+        visible: root.currentBackgroundMusicUrl !== ""
+
+        width: Math.min(parent.width * 0.45, 500)  // Compact size
+        height: 160
+
+        onPlayerReady: {
+            console.log("Background music player ready in Auto Mode")
+        }
     }
 
     // ========== Change View 버튼 (중앙 하단) ==========

@@ -198,4 +198,24 @@ void AppConfig::parseJson(const QJsonObject &json)
             if (spotify.contains("redirectUri")) m_spotifyRedirectUri = spotify["redirectUri"].toString();
         }
     }
+
+    // Background Music settings
+    if (json.contains("backgroundMusic")) {
+        QJsonObject bgMusic = json["backgroundMusic"].toObject();
+
+        // Glass mode background music
+        if (bgMusic.contains("glass")) {
+            m_glassModeBackgroundMusic = bgMusic["glass"].toString();
+        }
+
+        // Auto mode background music (per location)
+        if (bgMusic.contains("auto")) {
+            QJsonObject autoMusic = bgMusic["auto"].toObject();
+            m_autoModeBackgroundMusic.clear();
+
+            for (auto it = autoMusic.begin(); it != autoMusic.end(); ++it) {
+                m_autoModeBackgroundMusic[it.key()] = it.value().toString();
+            }
+        }
+    }
 }

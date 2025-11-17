@@ -5,13 +5,13 @@ import QtWebEngine
 
 /**
  * YouTube Player Widget - WebEngine Version
- * Embeds YouTube IFrame Player for reliable playback
+ * Embeds YouTube IFrame Player with logo on the left
  */
 Item {
     id: root
 
-    width: 400
-    height: 220
+    width: 480
+    height: 160
 
     // Exposed property for setting YouTube URL from outside
     property string youtubeUrl: ""
@@ -19,76 +19,76 @@ Item {
     // Signal when player is ready
     signal playerReady()
 
-    // Glass morphism background
+    // Glass morphism background with higher transparency
     Rectangle {
         anchors.fill: parent
-        radius: 20
-        color: Qt.rgba(0.1, 0.1, 0.15, 0.85)
-        border.color: Qt.rgba(1, 1, 1, 0.2)
+        radius: 24
+        color: Qt.rgba(0.1, 0.1, 0.15, 0.4)  // More transparent
+        border.color: Qt.rgba(1, 1, 1, 0.15)
         border.width: 1
 
-        // Gradient overlay
+        // Subtle gradient overlay
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
             gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.05) }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.05) }
+                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.03) }
+                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.03) }
             }
         }
     }
 
-    ColumnLayout {
+    RowLayout {
         anchors.fill: parent
         anchors.margins: 15
-        spacing: 10
+        spacing: 15
 
-        // Header
-        RowLayout {
-            Layout.fillWidth: true
+        // Left: YouTube Logo
+        Rectangle {
+            Layout.preferredWidth: 100
+            Layout.fillHeight: true
+            color: "transparent"
+            z: 10  // Ensure logo is above video
 
-            Text {
-                text: "🎵 YouTube Player"
-                font.pixelSize: 14
-                font.bold: true
-                color: "white"
+            Image {
+                id: youtubeLogo
+                anchors.centerIn: parent
+                width: 40
+                height: 40
+                source: "qrc:/assets/fonts/Youtube_logo.png"
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                smooth: true
+                cache: true
+
+                onStatusChanged: {
+                    if (status === Image.Error) {
+                        console.error("Failed to load YouTube logo from:", source)
+                    } else if (status === Image.Ready) {
+                        console.log("YouTube logo loaded successfully")
+                    }
+                }
             }
 
-            Item { Layout.fillWidth: true }
-
-            // Close button
-            Button {
-                implicitWidth: 30
-                implicitHeight: 30
-
-                background: Rectangle {
-                    radius: 15
-                    color: Qt.rgba(1, 1, 1, 0.1)
-                    border.color: Qt.rgba(1, 1, 1, 0.2)
-                    border.width: 1
-                }
-
-                contentItem: Text {
-                    text: "✕"
-                    color: "white"
-                    font.pixelSize: 14
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                onClicked: {
-                    root.youtubeUrl = ""
-                }
+            // Debug text if image fails to load
+            Text {
+                anchors.centerIn: parent
+                text: youtubeLogo.status === Image.Error ? "Youtube" : ""
+                font.pixelSize: 24
+                font.bold: true
+                color: "#000000"
+                visible: youtubeLogo.status === Image.Error
             }
         }
 
-        // WebEngine Player
+        // Right: Video Player
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: 10
+            radius: 12
             color: "#000000"
             clip: true
+            z: 1  // Video is behind logo
 
             WebEngineView {
                 id: webview
@@ -114,9 +114,9 @@ Item {
             // Loading/Status overlay
             Rectangle {
                 anchors.fill: parent
-                color: Qt.rgba(0, 0, 0, 0.7)
+                color: Qt.rgba(0, 0, 0, 0.8)
                 visible: statusText.text === "로딩 중..."
-                radius: 10
+                radius: 12
 
                 Text {
                     id: statusText
