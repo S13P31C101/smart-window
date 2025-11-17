@@ -81,32 +81,6 @@ async def recommend_music(request: dict):
 
 
 @app.post("/api/v1/ai/scene-blend")
-async def scene_blend(
-    original_file: UploadFile = File(...),
-    scene_type: str = Form(...),  # dawn, sunset, night, afternoon 중 하나
-    alpha: float = Form(0.7)
-):
-    scene_type = scene_type.lower().strip()
-    try:
-        orig_bytes = await original_file.read()
-        blend_file_path, prompt = utils.get_scene_assets(scene_type)
-        inpaint_result = utils.sunset_blend_pipeline(
-            orig_bytes,
-            blend_file_path,
-            alpha=alpha,
-            prompt=prompt
-        )
-        buf = io.BytesIO()
-        inpaint_result.save(buf, format="PNG")
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="image/png")
-    except Exception as e:
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-    
-
-
-
-@app.post("/api/v1/ai/removehuman-scene")
 async def removehuman_scene_and_upload(request: dict):
     media_id = request.get("mediaId")
     download_url = request.get("downloadUrl")
