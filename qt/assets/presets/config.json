@@ -5,6 +5,8 @@
   "theme": "dark",
   "gestureEnabled": true,
 
+  "deviceUniqueId": "",
+
   "mqtt": {
     "host": "localhost",
     "port": 1883,
