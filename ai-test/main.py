@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from PIL import Image
 import utils
+import json
 
 load_dotenv()
 app = FastAPI()
@@ -47,24 +48,32 @@ async def api_worker():
 
 @app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
+    print("[QUEUE INPUT] remove-person request =")
+    print(json.dumps(request, indent=2))  # 보기 좋게 출력!
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "remove-person", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict = Body(...)):
+    print("[QUEUE INPUT] recommend-music request =")
+    print(json.dumps(request, indent=2))  # 보기 좋게 출력!
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "recommend-music", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/scene-blend")
 async def scene_blend(request: dict = Body(...)):
+    print("[QUEUE INPUT] scene-blend request =")
+    print(json.dumps(request, indent=2))  # 보기 좋게 출력!
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "scene-blend", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
+    print("[QUEUE INPUT] generate-dalle-image request =")
+    print(json.dumps(request, indent=2))  # 보기 좋게 출력!
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "generate-dalle-image", request))
     return JSONResponse(content={"success": True, "task_id": task_id})

@@ -17,6 +17,7 @@ from transformers import (
     SegformerForSemanticSegmentation, SegformerImageProcessor
 )
 from huggingface_hub import login
+import json
 
 # -------- 환경 로딩 및 모델 준비 --------
 load_dotenv()
