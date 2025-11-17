@@ -1,6 +1,5 @@
 package com.lumiscape.smartwindow.device.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
@@ -11,18 +10,21 @@ import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
-import com.lumiscape.smartwindow.media.repository.MediaRepository;
+import com.lumiscape.smartwindow.media.service.MediaService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
-import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 
+import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.lumiscape.smartwindow.fcm.service.FcmNotificationService;
 
 @Slf4j
 @Service
@@ -31,11 +33,17 @@ import java.util.stream.Collectors;
 public class DeviceService {
 
     private final DeviceRepository deviceRepository;
-    private final UserRepository userRepository;
-    private final MediaRepository mediaRepository;
+    private final UserService userService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
-    private final ObjectMapper objectMapper;
+    private final FcmNotificationService fcmNotificationService;
+
+    private MediaService mediaService;
+
+    @Autowired
+    public void setMediaService(@Lazy MediaService mediaService) {
+        this.mediaService = mediaService;
+    }
 
     public List<DeviceDetailResponse> getMyDevice(Long userId) {
 
@@ -50,7 +58,7 @@ public class DeviceService {
             throw new CustomException(ErrorCode.DEVICE_ALREADY_EXISTS);
         }
 
-        User userReference = userRepository.getReferenceById(userId);
+        User userReference = userService.getUserReference(userId);
 
         Device newDevice = Device.builder()
                 .user(userReference)
@@ -95,7 +103,7 @@ public class DeviceService {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "power", Map.of("status", newStatus));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "power", Map.of("status", newStatus));
 
         device.updatePower(newStatus);
 
@@ -113,7 +121,7 @@ public class DeviceService {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "open", Map.of("status", newStatus));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "open", Map.of("status", newStatus));
 
         device.updateOpen(newStatus);
 
@@ -126,7 +134,7 @@ public class DeviceService {
 
         DeviceMode newMode = DeviceMode.valueOf(request.mode().toUpperCase());
 
-        publishMqttCommand(device.getDeviceUniqueId(), "mode", Map.of("mode", newMode.name()));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", newMode.name());
 
         device.updateMode(newMode);
 
@@ -149,8 +157,7 @@ public class DeviceService {
 
         Media media = null;
         if (mediaId != null) {
-            media = mediaRepository.findByIdAndUserId(mediaId, userId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
+            media = mediaService.findMediaByUser(mediaId, userId);
         }
 
         device.updateMedia(media);
@@ -164,35 +171,51 @@ public class DeviceService {
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
-        Device device = deviceRepository.findByDeviceUniqueId(deviceUniqueId)
-                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
-        // TODO
+        Device device = findByDeviceUniqueId(deviceUniqueId);
+        User user = device.getUser(); // 디바이스와 연결된 사용자 정보를 가져옵니다.
+        if (user == null) {
+            log.warn("Device {} has no associated user. Skipping FCM notification.", deviceUniqueId);
+            return;
+        }
+
+        String title = "스마트윈도우 알림";
+        String body = "";
+
         switch (statusType) {
             case "power":
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
+                body = device.getDeviceName() + " 전원이 " + (power ? "켜졌습니다." : "꺼졌습니다.");
+                fcmNotificationService.sendNotification(user.getId(), title, body);
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
                 device.updateOpen(open);
+                body = device.getDeviceName() + " 창문이 " + (open ? "열렸습니다." : "닫혔습니다.");
+                fcmNotificationService.sendNotification(user.getId(), title, body);
+                break;
+            case "sensor":
+                // TODO: 센서 값에 따른 알림 조건 및 내용 정의 필요
+                // 예를 들어, 특정 값 이상일 때만 알림을 보낼 수 있습니다.
+                // body = "새로운 센서 데이터가 감지되었습니다: " + payload;
+                // fcmNotificationService.sendNotification(user.getId(), title, body);
                 break;
         }
     }
 
-    private Device findDeviceByUser(Long deviceId, Long userId) {
+    @Transactional(readOnly = true)
+    public Device findDeviceByUser(Long deviceId, Long userId) {
         return deviceRepository.findByIdAndUserId(deviceId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FORBIDDEN_DEVICE_ACCESS));
     }
 
-    private void publishMqttCommand(String deviceUniqueId, String command, Object payload) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-            mqttPublishService.publishCommand(deviceUniqueId, command, jsonPayload);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize MQTT payload", e);
+    public List<Device> findByAllMedia(Media media) {
+        return deviceRepository.findAllByMedia(media);
+    }
 
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
+    public Device findByDeviceUniqueId(String deviceUniqueId) {
+        return deviceRepository.findByDeviceUniqueId(deviceUniqueId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
     }
 
     public void publishMediaUpdateToDevice(Device device) {
@@ -205,10 +228,10 @@ public class DeviceService {
             mediaId = media.getId();
 
             mediaUrl = s3Service.generatePresignedUrlForDownload(media.getFileUrl());
-
-            Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
-
-            publishMqttCommand(device.getDeviceUniqueId(), "media", payload);
         }
+
+        Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
     }
 }

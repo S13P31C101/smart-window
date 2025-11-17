@@ -1,18 +1,10 @@
 import { OAUTH_BASE_URL } from './axios';
 
-// 소셜 로그인 제공자 타입
-export type AuthProvider = 'kakao' | 'google' | 'naver';
-
 /**
- * 우리 백엔드 서버가 로그인 성공 후 앱으로 리디렉션할 때
- * URL 파라미터 등을 통해 전달해줄 데이터의 타입입니다.
+ * 각 소셜 로그인 제공업체별 인증 시작 URL을 생성합니다.
+ * @param provider 'google', 'naver', 'kakao' 중 하나
+ * @returns Spring Security OAuth2 클라이언트 인증 엔드포인트 URL
  */
-export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  // ... 기타 필요한 사용자 정보가 있다면 여기에 추가
-}
-
-export const getSocialLoginUrl = (provider: AuthProvider): string => {
+export const getSocialLoginUrl = (provider: 'google' | 'naver' | 'kakao') => {
   return `${OAUTH_BASE_URL}/oauth2/authorization/${provider}`;
 };

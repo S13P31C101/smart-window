@@ -123,7 +123,9 @@ public class JwtTokenProvider {
                 .map(SimpleGrantedAuthority::new)
                 .toList();
 
-        UserDetails principal = new User(claims.getSubject(), "", authorities);
+        // AuthenticationPrincipal UserDetails 미사용으로 Parsing 과정 생략
+        // UserDetails principal = new User(claims.getSubject(), "", authorities);
+        Long principal = Long.parseLong(claims.getSubject());
 
         return new UsernamePasswordAuthenticationToken(principal, token, authorities);
     }

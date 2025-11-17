@@ -9,7 +9,11 @@ const Tab = createMaterialTopTabNavigator();
 function DeviceTopTabNavigator() {
   return (
     <Tab.Navigator
+      // lazy 옵션을 true로 설정하여 비활성 탭이 렌더링되지 않도록 합니다.
+      lazy={true}
       screenOptions={{
+        swipeEnabled: false,
+        // animationEnabled: false, // 이 줄은 제거하여 탭 전환 애니메이션을 다시 활성화합니다.
         tabBarStyle: {
           backgroundColor: '#0F172A', // 배경색
           elevation: 0, // 안드로이드 그림자 제거

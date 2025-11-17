@@ -7,7 +7,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./certs:/etc/letsencrypt:ro
+      - certs-data:/etc/letsencrypt:ro
     depends_on:
       - spring-reborn
     networks:
@@ -46,7 +46,7 @@ services:
     ports:
       - "8883:8883"
     volumes:
-      - ./certs:/etc/letsencrypt:ro
+      - certs-data:/etc/letsencrypt:ro
     networks:
       - network-reborn
 
@@ -55,3 +55,5 @@ networks:
 
 volumes:
   postgres-data:
+  certs-data:
+    external: true

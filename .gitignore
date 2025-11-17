@@ -1,0 +1,9 @@
+# .gitignore
+
+# OAuth secrets
+# backend 폴더 안의 yml 파일을 무시하려면 경로를 명시해야 합니다.
+backend/application-oauth.yml
+
+# 민감한 파일 경로 추가
+# `smart-window` 폴더 기준이므로 backend/ 부터 시작합니다.
+backend/src/main/resources/smart-window-a4e7a-firebase-adminsdk-fbsvc-da2b0ce557.json
