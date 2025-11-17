@@ -3,12 +3,13 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserInfoResponse } from '@/api/user';
 
-interface AuthState {
+export interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   user: UserInfoResponse | null;
   isLoggedIn: () => boolean; // isLoggedIn을 함수로 변경
   setTokens: (tokens: { accessToken: string; refreshToken: string }) => void;
+  clearTokens: () => void; // Add this line
   setUser: (user: UserInfoResponse) => void;
   logout: () => void;
 }
@@ -27,6 +28,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
           refreshToken,
         }),
+      clearTokens: () => set({ accessToken: null, refreshToken: null }), // Add this implementation
       setUser: (user) => set({ user }),
       logout: () =>
         set({

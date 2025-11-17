@@ -1,5 +1,13 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from './axios';
+
+// 1. ApiResponse 타입을 여기에 정의합니다.
+export interface ApiResponse<T> {
+  isSuccess: boolean;
+  code: string;
+  message: string;
+  result: T;
+}
 
 // ============================================================================
 // 타입 정의 (backend의 dto 패키지 참고)
@@ -25,24 +33,31 @@ export interface MediaResponse {
 }
 
 // POST /media/upload-url 요청 DTO
-interface MediaUploadRequest {
+export interface MediaUploadRequest {
   fileName: string;
   fileType: MediaType; // 'contentType'에서 'fileType'으로, 'string'에서 'MediaType'으로 변경
 }
 
 // POST /media/upload-url 응답 DTO - 백엔드 MediaUploadResponse.java 와 일치하도록 수정
-interface MediaUploadResponse {
+export interface MediaUploadResponse {
   s3ObjectKey: string;
   fileUrl: string; // Pre-signed URL
 }
 
 // POST /media/upload 요청 DTO - 백엔드 MediaRegisterRequest.java 와 일치하도록 수정
-interface MediaRegisterRequest {
+export interface MediaRegisterRequest {
   s3ObjectKey: string;
   fileName: string;
   fileType: MediaType;
   fileSize: number;
   resolution: string | null;
+}
+
+// 백엔드 응답이 이중으로 감싸여 있어, 이를 처리하기 위한 래퍼(wrapper) 타입입니다.
+// 실제 데이터는 `data` 속성 안에 들어있습니다.
+interface BackendSuccessResponse<T> {
+  status: number;
+  data: T;
 }
 
 // ============================================================================
@@ -51,8 +66,10 @@ interface MediaRegisterRequest {
 
 // ------------------- C-1: 미디어 파일 목록 조회 -------------------
 const getMyMedia = async (): Promise<MediaResponse[]> => {
-  const response = await apiClient.get<MediaResponse[]>('/media');
-  return response.data;
+  const response = await apiClient.get<BackendSuccessResponse<MediaResponse[]>>(
+    '/media',
+  );
+  return response.data.data;
 };
 
 export const useGetMyMedia = () => {
@@ -66,15 +83,27 @@ export const useGetMyMedia = () => {
 const requestMediaUploadUrl = async (
   body: MediaUploadRequest,
 ): Promise<MediaUploadResponse> => {
-  const response = await apiClient.post<MediaUploadResponse>(
+  const response = await apiClient.post<any>( // 1. 응답 타입을 any로 임시 변경
     '/media/upload-url',
     body,
   );
-  return response.data;
+
+  console.log('백엔드 /media/upload-url 응답:', JSON.stringify(response.data, null, 2));
+  
+  // 2. 실제 응답 구조에 맞춰 데이터에 접근합니다.
+  const responseData = response.data.data;
+
+  // 3. 응답 데이터가 유효한지 확인하고 반환합니다.
+  if (responseData && responseData.s3ObjectKey && responseData.fileUrl) {
+    return responseData;
+  } else {
+    // 4. 유효하지 않은 경우, 구체적인 에러를 던집니다.
+    throw new Error('백엔드로부터 유효한 Pre-signed URL을 받지 못했습니다.');
+  }
 };
 
 export const useRequestMediaUploadUrl = () => {
-  return useMutation({
+  return useMutation<MediaUploadResponse, Error, MediaUploadRequest>({
     mutationFn: requestMediaUploadUrl,
   });
 };
@@ -83,8 +112,19 @@ export const useRequestMediaUploadUrl = () => {
 const registerMedia = async (
   body: MediaRegisterRequest,
 ): Promise<MediaResponse> => {
-  const response = await apiClient.post<MediaResponse>('/media/upload', body);
-  return response.data;
+  // 백엔드로 '/media/upload' API 요청을 보내기 직전의 데이터를 출력합니다.
+  console.log('백엔드 /media/upload 요청:', JSON.stringify(body, null, 2));
+
+  const response = await apiClient.post<BackendSuccessResponse<MediaResponse>>(
+    '/media/upload',
+    body,
+  );
+
+  // 백엔드로부터 받은 응답 전체를 출력합니다.
+  console.log('백엔드 /media/upload 응답:', JSON.stringify(response.data, null, 2));
+
+  // requestMediaUploadUrl 와 마찬가지로 실제 데이터는 data 속성 안에 있습니다.
+  return response.data.data;
 };
 
 export const useRegisterMedia = () => {
@@ -95,8 +135,8 @@ export const useRegisterMedia = () => {
 
 // ------------------- C-4: 미디어 파일 상세 조회 -------------------
 const getMediaDetail = async (mediaId: number): Promise<MediaResponse> => {
-  const response = await apiClient.get<MediaResponse>(`/media/${mediaId}`);
-  return response.data;
+  const response = await apiClient.get(`/media/${mediaId}`);
+  return response as unknown as MediaResponse;
 };
 
 export const useGetMediaDetail = (mediaId: number) => {
@@ -108,7 +148,7 @@ export const useGetMediaDetail = (mediaId: number) => {
 };
 
 // ------------------- C-5: 미디어 파일 별명 변경 -------------------
-interface UpdateMediaNameRequest {
+export interface UpdateMediaNameRequest {
   mediaId: number;
   fileName: string;
 }
@@ -117,28 +157,36 @@ const updateMediaName = async ({
   mediaId,
   fileName,
 }: UpdateMediaNameRequest): Promise<MediaResponse> => {
-  const response = await apiClient.put<MediaResponse>(
+  const response = await apiClient.put<BackendSuccessResponse<MediaResponse>>(
     `/media/${mediaId}/name`,
-    { fileName }, // 백엔드에서 Map<String, String>으로 받으므로 이 형식으로 보냅니다.
+    { fileName },
   );
-  return response.data;
+  // 다른 API와 마찬가지로, 실제 데이터는 response.data.data에 있습니다.
+  return response.data.data;
 };
 
 export const useUpdateMediaName = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateMediaName,
-    // TODO: 성공 시 목록 쿼리 무효화 등 추가 작업
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myMedia'] });
+    },
   });
 };
 
 // ------------------- C-6: 미디어 파일 삭제 -------------------
 const deleteMedia = async (mediaId: number): Promise<void> => {
+  // 여기는 반환값이 없으므로 수정할 필요가 없습니다.
   await apiClient.delete(`/media/${mediaId}`);
 };
 
 export const useDeleteMedia = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteMedia,
-    // TODO: 성공 시 목록 쿼리 무효화 등 추가 작업
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myMedia'] });
+    },
   });
 };

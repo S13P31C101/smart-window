@@ -1,62 +1,91 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { useAuthStore } from '@/stores/authStore';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/navigation/AuthNavigator';
-import { ActivityIndicator } from 'react-native';
 import { COLORS } from '@/constants/color';
+import { useFocusEffect } from '@react-navigation/native';
+
+// 👇 1. 안드로이드 크롬 브라우저의 일반적인 User Agent 문자열을 정의합니다.
+const ANDROID_USER_AGENT = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36";
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SocialLogin'>;
 
-// 백엔드의 AuthController에 명시된 성공 경로와 일치시킵니다.
-const REDIRECT_PATH = '/auth/success';
-
-// 웹페이지의 pre 태그 안에 있는 JSON 문자열을 파싱하기 위한 Javascript 코드
+// 이전 코드의 안정적인 스크립트를 그대로 사용합니다.
 const INJECTED_JAVASCRIPT = `
-  const pre = document.querySelector('pre');
-  const json = JSON.parse(pre.innerText);
-  window.ReactNativeWebView.postMessage(JSON.stringify(json));
-  true;
+  (function() {
+    try {
+      const pre = document.querySelector('pre');
+      const content = pre ? pre.textContent : document.body.innerText;
+      JSON.parse(content);
+      document.body.style.display = 'none';
+      window.ReactNativeWebView.postMessage(content);
+    } catch (e) {
+      // JSON이 아니면 무시
+    }
+    return true;
+  })();
 `;
 
 function SocialLoginScreen({ route }: Props) {
-  const { url } = route.params;
+  // 👇 2. route.params에서 'provider'를 받아옵니다.
+  const { url: initialUrl, provider } = route.params;
   const { setTokens } = useAuthStore();
+  
+  // 1. WebView를 강제로 새로고침(재마운트)하기 위한 상태
+  const [webViewKey, setWebViewKey] = useState(0);
+  const [url, setUrl] = useState(initialUrl); // This state variable is fine
 
-  const handleNavigationStateChange = (navState: WebViewNavigation) => {
-    // URL에 REDIRECT_PATH가 포함되어 있는지 확인
-    if (navState.url.includes(REDIRECT_PATH)) {
-      // WebView의 JS 실행을 막아 다른 페이지로 이동하는 것을 방지
-      // 이 시점부터는 postMessage로 데이터를 받습니다.
-      webViewRef.current?.stopLoading();
-    }
-  };
-
+  // 2. 화면에 들어올 때마다 WebView를 리셋하여 새로운 세션을 보장합니다.
+  useFocusEffect(
+    useCallback(() => {
+      // WebView의 key를 변경하면 컴포넌트가 완전히 새로 렌더링되어 상태가 초기화됩니다.
+      setWebViewKey(prevKey => prevKey + 1);
+      // URL에 랜덤 파라미터를 추가하여 웹 캐시 사용을 방지합니다.
+      const randomUrl = `${initialUrl}?random=${Math.random()}`;
+      setUrl(randomUrl);
+      // 👇 [로그 추가] 화면이 포커스될 때마다 WebView가 리셋되는지 확인합니다.
+      console.log('[SocialLoginScreen] 화면 포커스됨. WebView 리셋 및 URL 캐시 방지:', randomUrl);
+    }, [initialUrl])
+  );
+  
   const handleMessage = (event: any) => {
     try {
-      const { accessToken, refreshToken } = JSON.parse(event.nativeEvent.data);
+      // 👇 [로그 추가] 백엔드로부터 받은 최종 메시지(JSON)를 확인합니다.
+      console.log('[SocialLoginScreen] WebView로부터 메시지 수신:', event.nativeEvent.data);
+      const response = JSON.parse(event.nativeEvent.data);
+      const { accessToken, refreshToken } = response.data;
 
       if (accessToken && refreshToken) {
-        // Zustand 스토어에 토큰 저장 -> RootNavigator가 감지하여 홈으로 이동
+        console.log('[SocialLoginScreen] 토큰 파싱 성공! accessToken:', accessToken);
         setTokens({ accessToken, refreshToken });
+      } else {
+        console.error('[SocialLoginScreen] 응답 데이터에 토큰이 없습니다:', response);
       }
     } catch (error) {
-      console.error('Failed to parse token from WebView', error);
-      // 에러 처리 (예: 로그인 화면으로 다시 보내기)
+      console.error('[SocialLoginScreen] WebView 메시지 파싱 실패:', error, '원본 데이터:', event.nativeEvent.data);
     }
   };
 
-  const webViewRef = React.useRef<WebView>(null);
+  // 👇 2. WebView의 URL이 변경될 때마다 로그를 찍는 함수를 추가합니다.
+  const handleNavigationStateChange = (navState: WebViewNavigation) => {
+    console.log('[SocialLoginScreen] WebView URL 변경:', navState.url);
+  };
 
   return (
     <View style={styles.container}>
       <WebView
-        ref={webViewRef}
-        source={{ uri: url }}
-        onNavigationStateChange={handleNavigationStateChange}
+        key={webViewKey} // key prop을 사용하여 WebView를 강제로 리셋
+        source={{ uri: url }} // 👈 받은 URL을 그대로 WebView에 띄움
+        // 👇 3. provider가 'google'일 때만 userAgent를 변경하도록 설정합니다.
+        userAgent={provider === 'google' ? ANDROID_USER_AGENT : undefined}
         onMessage={handleMessage}
+        // 👇 3. WebView에 로깅을 위한 prop들을 추가합니다.
+        onNavigationStateChange={handleNavigationStateChange} // URL 변경 감지
+        onError={(event) => console.error('[SocialLoginScreen] WebView 에러 발생:', event.nativeEvent)} // WebView 자체 에러 감지
         injectedJavaScript={INJECTED_JAVASCRIPT}
+        javaScriptEnabled={true}
         startInLoadingState={true}
         renderLoading={() => (
           <ActivityIndicator
@@ -65,6 +94,9 @@ function SocialLoginScreen({ route }: Props) {
             style={styles.loading}
           />
         )}
+        // 3. WebView 자체 옵션으로 세션을 격리합니다.
+        incognito={true}
+        cacheEnabled={false}
       />
     </View>
   );

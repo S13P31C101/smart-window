@@ -1,14 +1,12 @@
 package com.lumiscape.smartwindow.alarm.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.alarm.domain.Alarm;
 import com.lumiscape.smartwindow.alarm.dto.AlarmCreateRequest;
 import com.lumiscape.smartwindow.alarm.dto.AlarmResponse;
 import com.lumiscape.smartwindow.alarm.dto.AlarmUpdateRequest;
 import com.lumiscape.smartwindow.alarm.repository.AlarmRepository;
 import com.lumiscape.smartwindow.device.domain.Device;
-import com.lumiscape.smartwindow.device.repository.DeviceRepository;
+import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
@@ -28,9 +26,8 @@ import java.util.stream.Collectors;
 public class AlarmService {
 
     private final AlarmRepository alarmRepository;
-    private final DeviceRepository deviceRepository;
+    private final DeviceService deviceService;
     private final MqttPublishService mqttPublishService;
-    private final ObjectMapper objectMapper;
 
     public List<AlarmResponse> getAllUserAlarms(Long userId) {
 
@@ -41,8 +38,7 @@ public class AlarmService {
 
     @Transactional
     public AlarmResponse createAlarm(Long userId, AlarmCreateRequest request) {
-        Device device = deviceRepository.findByIdAndUserId(request.deviceId(), userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.FORBIDDEN_DEVICE_ACCESS));
+        Device device = deviceService.findDeviceByUser(request.deviceId(), userId);
 
         Alarm alarm = Alarm.builder()
                 .device(device)
@@ -93,9 +89,7 @@ public class AlarmService {
     }
 
     public List<AlarmResponse> getAlarmsByDevice(Long userId, Long deviceId) {
-        if (deviceRepository.findByIdAndUserId(deviceId, userId).isEmpty()) {
-            throw new CustomException(ErrorCode.FORBIDDEN_DEVICE_ACCESS);
-        }
+        deviceService.findDeviceByUser(deviceId, userId);
 
         return alarmRepository.findAllByDeviceId(deviceId).stream()
                 .map(AlarmResponse::from)
@@ -103,8 +97,7 @@ public class AlarmService {
     }
 
     public void publishAlarmListToDevice(String deviceUniqueId) {
-        Device device = deviceRepository.findByDeviceUniqueId(deviceUniqueId)
-                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+        Device device = deviceService.findByDeviceUniqueId(deviceUniqueId);
 
         List<Alarm> allAlarms = alarmRepository.findAllByDeviceId(device.getId());
 
@@ -112,7 +105,7 @@ public class AlarmService {
                 .map(AlarmResponse::from)
                 .toList();
 
-        publishMqtt(device.getDeviceUniqueId(), "alarm", alarmPayloads);
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "alarm", alarmPayloads);
 
         log.info("MQTT Publish : deviceUID = {}, Total : {}", device.getDeviceUniqueId(), alarmPayloads.size());
     }
@@ -131,19 +124,8 @@ public class AlarmService {
             payload = Map.of("action", "UPSERT", "alarm", AlarmResponse.from(alarm));
         }
 
-        publishMqtt(device.getDeviceUniqueId(), "alarm", payload);
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "alarm", payload);
 
         log.info("MQTT Publish : deviceUID = {}, Action = {}, AlarmId = {}", device.getDeviceUniqueId(), action, alarm.getId());
-    }
-
-    private void publishMqtt(String deviceUniqueId, String command, Object payload) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-            mqttPublishService.publishCommand(deviceUniqueId, command, jsonPayload);
-        } catch (JsonProcessingException e) {
-            log.error("MQTT Publish FAILED : deviceUID = {}, Command = {}", deviceUniqueId, command, e);
-
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
     }
 }

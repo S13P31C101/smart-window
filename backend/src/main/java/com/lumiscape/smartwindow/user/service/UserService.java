@@ -34,6 +34,11 @@ public class UserService {
         user.updateNickname(requestDto.getNickname());
     }
 
+    @Transactional
+    public User getUserReference(Long userId) {
+        return userRepository.getReferenceById(userId);
+    }
+
     // ↓↓↓ 여기에 최종 버전의 회원 탈퇴 로직을 추가합니다. ↓↓↓
     @Transactional
     public void deleteUser(Long userId) {

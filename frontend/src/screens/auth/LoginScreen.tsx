@@ -1,44 +1,33 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Button } from 'react-native'; // Button 추가
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SocialLoginButton from '@/components/SocialLoginButton';
-import { COLORS } from '@/constants/color'; // 1. COLORS import 추가
-import { useNavigation } from '@react-navigation/native'; // 1. useNavigation import
-import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // 1. import 경로 수정
-import { AuthStackParamList } from '@/navigation/AuthNavigator'; // 3. AuthStackParamList import
-import { getSocialLoginUrl } from '@/api/auth'; // 4. getSocialLoginUrl import
-import { useAuthStore } from '@/stores/authStore'; // 1. Auth Store import
+import { COLORS } from '@/constants/color';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '@/navigation/AuthNavigator';
+import { getSocialLoginUrl } from '@/api/auth';
+import AppLogo from '@/assets/smartwindow_icon-v1.jpg'; // 1. 로고 이미지 import
 
-// 2. 타입 이름 수정
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 function LoginScreen() {
-  const navigation = useNavigation<NavigationProp>(); // 6. navigation 객체 생성
-  const { setTokens } = useAuthStore(); // 2. setTokens 함수 가져오기
+  const navigation = useNavigation<NavigationProp>();
 
-  // 7. handleLogin 함수 수정
   const handleLogin = (provider: 'google' | 'naver' | 'kakao') => {
     const url = getSocialLoginUrl(provider);
+    // 👇 [로그 추가] 생성된 URL을 콘솔에 출력합니다.
+    console.log(`[LoginScreen] ${provider} 로그인 시도. 생성된 URL:`, url);
+    // 👇 SocialLoginScreen으로 'provider'와 'url'을 함께 전달합니다.
     navigation.navigate('SocialLogin', { provider, url });
-  };
-
-  // 3. 개발용 로그인 핸들러 추가
-  const handleDevLogin = () => {
-    console.log('--- DEVELOPMENT LOGIN ---');
-    console.log('Bypassing social login with fake tokens.');
-    setTokens({
-      accessToken: 'fake-access-token-for-development',
-      refreshToken: 'fake-refresh-token-for-development',
-    });
-    // setTokens가 호출되면 RootNavigator가 상태 변화를 감지하고 자동으로 홈 화면으로 이동시킵니다.
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          {/* TODO: 로고 이미지로 교체 */}
-          <View style={styles.logoPlaceholder} />
+          {/* 2. 로고 이미지를 표시합니다. */}
+          <Image source={AppLogo} style={styles.logo} />
           <Text style={styles.title}>SMART WINDOW</Text>
           <Text style={styles.subtitle}>스마트 창문 제어 시스템</Text>
         </View>
@@ -48,17 +37,6 @@ function LoginScreen() {
           <SocialLoginButton provider="google" onPress={() => handleLogin('google')} />
           <SocialLoginButton provider="naver" onPress={() => handleLogin('naver')} />
           <SocialLoginButton provider="kakao" onPress={() => handleLogin('kakao')} />
-
-          {/* 4. 개발 모드에서만 보이는 로그인 버튼 추가 */}
-          {__DEV__ && (
-            <View style={{ marginTop: 20 }}>
-              <Button
-                title="🚀 개발용 로그인"
-                onPress={handleDevLogin}
-                color={COLORS.textAccent}
-              />
-            </View>
-          )}
         </View>
 
         <View style={styles.footer}>
@@ -91,11 +69,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 50,
   },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: COLORS.surfacePlaceholder, // 2. 색상 교체
+  // 4. 로고 스타일을 추가하고, 기존 플레이스홀더 스타일은 제거합니다.
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 22,
     marginBottom: 20,
   },
   title: {

@@ -7,13 +7,26 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
+import { launchImageLibrary, ImagePickerResponse, Asset } from 'react-native-image-picker';
+import {
+  useRequestMediaUploadUrl,
+  useRegisterMedia,
+  MediaUploadRequest,
+} from '@/api/media';
+import { useQueryClient } from '@tanstack/react-query';
 
 function ImageUploadScreen() {
   const [imageName, setImageName] = useState('');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<Asset | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const queryClient = useQueryClient();
+  const requestUrlMutation = useRequestMediaUploadUrl();
+  const registerMediaMutation = useRegisterMedia();
 
   const handleChoosePhoto = () => {
     launchImageLibrary({ mediaType: 'photo' }, (response: ImagePickerResponse) => {
@@ -22,10 +35,95 @@ function ImageUploadScreen() {
       } else if (response.errorCode) {
         console.log('ImagePicker Error: ', response.errorMessage);
       } else if (response.assets && response.assets.length > 0) {
-        setSelectedImage(response.assets[0].uri || null);
+        setSelectedImage(response.assets[0]);
+        if (!imageName && response.assets[0].fileName) {
+          setImageName(response.assets[0].fileName.split('.')[0]);
+        }
       }
     });
   };
+
+  const handleUpload = async () => {
+    if (!selectedImage || !selectedImage.uri || !selectedImage.fileName || !selectedImage.type) {
+      Alert.alert('오류', '이미지 정보가 올바르지 않습니다.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // 1. 업로드 URL 요청
+      console.log('1. 업로드 URL 요청 시작...');
+      const mediaData: MediaUploadRequest = {
+        fileName: selectedImage.fileName,
+        fileType: 'IMAGE',
+      };
+      console.log('업로드 URL 요청 데이터:', mediaData);
+      const uploadUrlResponse = await requestUrlMutation.mutateAsync(mediaData);
+      console.log('2. 업로드 URL 받기 성공:', uploadUrlResponse);
+
+      if (!uploadUrlResponse || !uploadUrlResponse.s3ObjectKey || !uploadUrlResponse.fileUrl) {
+        throw new Error('업로드 URL 응답이 예상과 다릅니다.');
+      }
+
+      const { s3ObjectKey, fileUrl } = uploadUrlResponse;
+
+      // 2. 이미지 파일을 Blob 형태로 변환
+      const response = await fetch(selectedImage.uri);
+      const blob = await response.blob();
+      console.log('3. 이미지 파일을 Blob으로 변환 성공');
+
+      // 3. S3에 파일 업로드 (PUT 요청)
+      console.log('4. S3에 업로드 시작...');
+      const uploadResponse = await fetch(fileUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': selectedImage.type,
+        },
+        body: blob,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 업로드 실패: ${uploadResponse.status}`);
+      }
+      console.log('5. S3 업로드 성공');
+
+      // 4. 백엔드에 등록 완료 보고
+      console.log('6. 백엔드에 미디어 등록 시작...');
+      const registerPayload = {
+        s3ObjectKey: s3ObjectKey,
+        fileName: imageName,
+        fileType: 'IMAGE' as const, // 'IMAGE' 타입을 명확히 해줍니다.
+        fileSize: selectedImage.fileSize || 0,
+        resolution:
+          selectedImage.width && selectedImage.height
+            ? `${selectedImage.width}x${selectedImage.height}`
+            : null,
+      };
+      // 등록 요청으로 보낼 데이터를 콘솔에 출력합니다.
+      console.log('미디어 등록 요청 데이터:', registerPayload);
+      
+      const registerResponse = await registerMediaMutation.mutateAsync(registerPayload);
+
+      // 등록 성공 후 백엔드로부터 받은 응답을 콘솔에 출력합니다.
+      console.log('7. 미디어 등록 성공:', registerResponse);
+
+      Alert.alert('성공', '이미지가 성공적으로 등록되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['myMedia'] }); // 보관함 목록 갱신
+      // 초기화
+      setImageName('');
+      setSelectedImage(null);
+
+    } catch (error) {
+      // --- 이 부분을 아래와 같이 수정해주세요 ---
+      console.error('이미지 업로드 중 오류 발생! 상세 정보:', error);
+      console.error('에러 객체 전체 출력:', JSON.stringify(error, null, 2));
+      Alert.alert('오류', '이미지 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
 
   return (
     <ScrollView style={styles.container}>
@@ -43,8 +141,8 @@ function ImageUploadScreen() {
       <View style={styles.formGroup}>
         <Text style={styles.label}>이미지 선택 *</Text>
         <TouchableOpacity style={styles.imagePicker} onPress={handleChoosePhoto}>
-          {selectedImage ? (
-            <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+          {selectedImage?.uri ? (
+            <Image source={{ uri: selectedImage.uri }} style={styles.previewImage} />
           ) : (
             <>
               <Icon name="image-outline" size={80} color="#8291AC" />
@@ -57,9 +155,19 @@ function ImageUploadScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.submitButton} disabled={!imageName || !selectedImage}>
-        <Icon name="cloud-upload-outline" size={20} color="#FFF" />
-        <Text style={styles.submitButtonText}>등록하기</Text>
+      <TouchableOpacity 
+        style={[styles.submitButton, (!imageName || !selectedImage || isUploading) && styles.disabledButton]} 
+        disabled={!imageName || !selectedImage || isUploading}
+        onPress={handleUpload}
+      >
+        {isUploading ? (
+          <ActivityIndicator color="#FFF" />
+        ) : (
+          <>
+            <Icon name="cloud-upload-outline" size={20} color="#FFF" />
+            <Text style={styles.submitButtonText}>등록하기</Text>
+          </>
+        )}
       </TouchableOpacity>
 
       <View style={styles.infoBox}>
@@ -135,7 +243,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    opacity: 0.8,
+  },
+  disabledButton: {
+    backgroundColor: '#A5D6A7',
   },
   submitButtonText: {
     color: '#FFF',
