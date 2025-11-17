@@ -307,12 +307,34 @@ Item {
 
         // Power OFF 버튼
         Rectangle {
+            id: powerOffButton
             width: root.width * 0.22
             height: root.height * 0.045
             radius: 12
             color: "#ef4444" // red
             border.color: "#dc2626"
             border.width: 2
+
+            property bool gestureHovered: false
+
+            // Power off action function
+            function executePowerOff() {
+                // Publish power off command via MQTT
+                var commandTopic = "/devices/" + appConfig.deviceUniqueId + "/command/power"
+                var commandPayload = { "status": false }
+                mqttClient.publishJson(commandTopic, commandPayload, 1)
+                console.log("📤 Power OFF command →", commandTopic, commandPayload)
+
+                // Publish status update
+                var statusTopic = "/devices/" + appConfig.deviceUniqueId + "/status"
+                var statusPayload = { "power": "off", "timestamp": Date.now() }
+                mqttClient.publishJson(statusTopic, statusPayload, 1)
+                console.log("📤 Status update →", statusTopic, statusPayload)
+
+                // Transition device to standby state
+                router.navigateTo("standby")
+                console.log("🔌 Device transitioning to standby mode")
+            }
 
             layer.enabled: true
             layer.effect: MultiEffect {
@@ -343,35 +365,74 @@ Item {
             }
 
             MouseArea {
+                id: powerOffClickArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    var topic = "/devices/" + appConfig.deviceUniqueId + "/command/power"
-                    var payload = { "status": false }
-                    mqttClient.publishJson(topic, payload, 1)
-                    console.log("📤 Power OFF →", topic, payload)
-                }
+                onClicked: powerOffButton.executePowerOff()
             }
 
-            scale: controlMa1.pressed ? 0.95 : (controlMa1.containsMouse ? 1.05 : 1.0)
+            scale: controlMa1.pressed ? 0.95 : ((controlMa1.containsMouse || gestureHovered) ? 1.05 : 1.0)
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
             MouseArea {
                 id: controlMa1
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: parent.children[2].clicked()
+                onClicked: powerOffButton.executePowerOff()
+            }
+
+            // Gesture hover detection
+            Timer {
+                interval: 50
+                running: typeof gestureBridge !== 'undefined' && gestureBridge.handDetected
+                repeat: true
+                onTriggered: {
+                    if (!gestureBridge || !gestureBridge.handDetected) {
+                        powerOffButton.gestureHovered = false
+                        return
+                    }
+                    var cursorScreenX = gestureBridge.cursorX * root.width
+                    var cursorScreenY = gestureBridge.cursorY * root.height
+                    var buttonPos = powerOffButton.mapToItem(root, 0, 0)
+                    var isInside = (cursorScreenX >= buttonPos.x &&
+                                  cursorScreenX <= buttonPos.x + powerOffButton.width &&
+                                  cursorScreenY >= buttonPos.y &&
+                                  cursorScreenY <= buttonPos.y + powerOffButton.height)
+                    powerOffButton.gestureHovered = isInside
+                }
+            }
+
+            // Gesture click detection
+            Connections {
+                target: typeof gestureBridge !== 'undefined' ? gestureBridge : null
+                function onFistDetected() {
+                    if (powerOffButton.gestureHovered) {
+                        console.log("Gesture click on Power OFF button")
+                        powerOffButton.executePowerOff()
+                    }
+                }
             }
         }
 
         // Open Window 버튼
         Rectangle {
+            id: openButton
             width: root.width * 0.22
             height: root.height * 0.045
             radius: 12
             color: "#3b82f6" // blue
             border.color: "#2563eb"
             border.width: 2
+
+            property bool gestureHovered: false
+
+            // Open window action function
+            function executeOpenWindow() {
+                var topic = "/devices/" + appConfig.deviceUniqueId + "/command/open"
+                var payload = { "status": true }
+                mqttClient.publishJson(topic, payload, 1)
+                console.log("📤 Open Window →", topic, payload)
+            }
 
             layer.enabled: true
             layer.effect: MultiEffect {
@@ -402,35 +463,74 @@ Item {
             }
 
             MouseArea {
+                id: openClickArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    var topic = "/devices/" + appConfig.deviceUniqueId + "/command/open"
-                    var payload = { "status": true }
-                    mqttClient.publishJson(topic, payload, 1)
-                    console.log("📤 Open Window →", topic, payload)
-                }
+                onClicked: openButton.executeOpenWindow()
             }
 
-            scale: controlMa2.pressed ? 0.95 : (controlMa2.containsMouse ? 1.05 : 1.0)
+            scale: controlMa2.pressed ? 0.95 : ((controlMa2.containsMouse || gestureHovered) ? 1.05 : 1.0)
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
             MouseArea {
                 id: controlMa2
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: parent.children[2].clicked()
+                onClicked: openButton.executeOpenWindow()
+            }
+
+            // Gesture hover detection
+            Timer {
+                interval: 50
+                running: typeof gestureBridge !== 'undefined' && gestureBridge.handDetected
+                repeat: true
+                onTriggered: {
+                    if (!gestureBridge || !gestureBridge.handDetected) {
+                        openButton.gestureHovered = false
+                        return
+                    }
+                    var cursorScreenX = gestureBridge.cursorX * root.width
+                    var cursorScreenY = gestureBridge.cursorY * root.height
+                    var buttonPos = openButton.mapToItem(root, 0, 0)
+                    var isInside = (cursorScreenX >= buttonPos.x &&
+                                  cursorScreenX <= buttonPos.x + openButton.width &&
+                                  cursorScreenY >= buttonPos.y &&
+                                  cursorScreenY <= buttonPos.y + openButton.height)
+                    openButton.gestureHovered = isInside
+                }
+            }
+
+            // Gesture click detection
+            Connections {
+                target: typeof gestureBridge !== 'undefined' ? gestureBridge : null
+                function onFistDetected() {
+                    if (openButton.gestureHovered) {
+                        console.log("Gesture click on Open Window button")
+                        openButton.executeOpenWindow()
+                    }
+                }
             }
         }
 
         // Close Window 버튼
         Rectangle {
+            id: closeButton
             width: root.width * 0.22
             height: root.height * 0.045
             radius: 12
             color: "#f59e0b" // amber
             border.color: "#d97706"
             border.width: 2
+
+            property bool gestureHovered: false
+
+            // Close window action function
+            function executeCloseWindow() {
+                var topic = "/devices/" + appConfig.deviceUniqueId + "/command/open"
+                var payload = { "status": false }
+                mqttClient.publishJson(topic, payload, 1)
+                console.log("📤 Close Window →", topic, payload)
+            }
 
             layer.enabled: true
             layer.effect: MultiEffect {
@@ -461,24 +561,52 @@ Item {
             }
 
             MouseArea {
+                id: closeClickArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    var topic = "/devices/" + appConfig.deviceUniqueId + "/command/open"
-                    var payload = { "status": false }
-                    mqttClient.publishJson(topic, payload, 1)
-                    console.log("📤 Close Window →", topic, payload)
-                }
+                onClicked: closeButton.executeCloseWindow()
             }
 
-            scale: controlMa3.pressed ? 0.95 : (controlMa3.containsMouse ? 1.05 : 1.0)
+            scale: controlMa3.pressed ? 0.95 : ((controlMa3.containsMouse || gestureHovered) ? 1.05 : 1.0)
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
             MouseArea {
                 id: controlMa3
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: parent.children[2].clicked()
+                onClicked: closeButton.executeCloseWindow()
+            }
+
+            // Gesture hover detection
+            Timer {
+                interval: 50
+                running: typeof gestureBridge !== 'undefined' && gestureBridge.handDetected
+                repeat: true
+                onTriggered: {
+                    if (!gestureBridge || !gestureBridge.handDetected) {
+                        closeButton.gestureHovered = false
+                        return
+                    }
+                    var cursorScreenX = gestureBridge.cursorX * root.width
+                    var cursorScreenY = gestureBridge.cursorY * root.height
+                    var buttonPos = closeButton.mapToItem(root, 0, 0)
+                    var isInside = (cursorScreenX >= buttonPos.x &&
+                                  cursorScreenX <= buttonPos.x + closeButton.width &&
+                                  cursorScreenY >= buttonPos.y &&
+                                  cursorScreenY <= buttonPos.y + closeButton.height)
+                    closeButton.gestureHovered = isInside
+                }
+            }
+
+            // Gesture click detection
+            Connections {
+                target: typeof gestureBridge !== 'undefined' ? gestureBridge : null
+                function onFistDetected() {
+                    if (closeButton.gestureHovered) {
+                        console.log("Gesture click on Close Window button")
+                        closeButton.executeCloseWindow()
+                    }
+                }
             }
         }
     }
