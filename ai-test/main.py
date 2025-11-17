@@ -63,20 +63,39 @@ async def remove_person_and_upload(request: dict = Body(...), background_tasks: 
     # 빠른 응답
     return JSONResponse(content={"success": True, "message": "Person removal started. You will be notified when it is done."})
 
-@app.post("/api/v1/ai/upload-image")
-async def upload_image(file: UploadFile = File(...)):
-    contents = await file.read()
-    caption = utils.extract_mood_caption(contents)
-    return {"mood_caption": caption}
-
 @app.post("/api/v1/ai/recommend-music")
-async def recommend_music(request: dict):
-    mood_caption = request.get("mood_caption")
-    result = await utils.search_youtube_music(mood_caption + " piano music")
+async def recommend_music(request: dict = Body(...)):
+    download_url = request.get("downloadUrl")
+    if not download_url:
+        raise HTTPException(status_code=400, detail="downloadUrl is required")
+
+    # 1. 외부 이미지 다운로드
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(download_url)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to download image")
+        image = Image.open(io.BytesIO(resp.content)).convert("RGB")
+
+    # 2. 키워드 추출 (여기서는 utils.extract_mood_caption 활용)
+    caption = await utils.extract_mood_caption_async(image)  # 비동기 함수로 구현 필요시
+    # 또는 동기라면
+    # caption = utils.extract_mood_caption(resp.content)
+
+    # 3. 키워드+음악 추천 (유튜브 검색)
+    result = await utils.search_youtube_music(caption + " piano music")
     if result:
-        return {"message": f"Found song '{result['title']}'", "youtube_url": result["url"]}
+        return {
+            "success": True,
+            "message": f"Found song '{result['title']}'",
+            "youtube_url": result["url"],
+            "mood_caption": caption
+        }
     else:
-        return {"message": "No matching music found."}
+        return {
+            "success": False,
+            "message": "No matching music found.",
+            "mood_caption": caption
+        }
 
 
 
