@@ -77,7 +77,7 @@ async def recommend_music(request: dict = Body(...)):
         image = Image.open(io.BytesIO(resp.content)).convert("RGB")
 
     # 2. 키워드 추출 (여기서는 utils.extract_mood_caption 활용)
-    caption = await utils.extract_mood_caption_async(image)  # 비동기 함수로 구현 필요시
+    caption = await utils.extract_mood_caption(image)  # 비동기 함수로 구현 필요시
     # 또는 동기라면
     # caption = utils.extract_mood_caption(resp.content)
 
