@@ -26,7 +26,15 @@ CREATE TYPE media_type_enum AS ENUM (
 
 CREATE TYPE media_origin_enum AS ENUM (
     'ORIGINAL', 
-    'AI_GENERATED'
+    'AI_RP',
+    'AI_SUNSET',
+    'AI_DAWN',
+    'AI_AFTERNOON',
+    'AI_NIGHT',
+    'AI_RP_SUNSET',
+    'AI_RP_DAWN',
+    'AI_RP_AFTERNOON',
+    'AI_RP_NIGHT'
 );
 
 CREATE TYPE permission_level_enum AS ENUM (
