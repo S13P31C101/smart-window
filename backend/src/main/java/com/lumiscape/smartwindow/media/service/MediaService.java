@@ -120,7 +120,7 @@ public class MediaService {
 
         List<Device> affectedDevices = deviceService.findByAllMedia(mediaToDelete);
 
-        Media replacementMedia = (mediaToDelete.getOriginType() == MediaOrigin.AI_GENERATED && mediaToDelete.getParentMedia() != null)
+        Media replacementMedia = (mediaToDelete.getOriginType() != MediaOrigin.ORIGINAL && mediaToDelete.getParentMedia() != null)
                 ? mediaToDelete.getParentMedia() : null;
 
         for (Device device : affectedDevices) {
@@ -147,7 +147,21 @@ public class MediaService {
         Media parentMedia = mediaRepository.findById(request.parentMediaId())
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
 
-        String aiFileName = FileNameUtils.addSuffixBeforeExtension(parentMedia.getFileName(), "(AI)");
+        String type = FileNameUtils.extractAITypeFromKey(request.s3ObjectKey());
+        if (type == null || type.isEmpty()) {
+            log.error("[ AI ] 지원하지 않는 AI 생성 타입입니다. Type: {}", request.s3ObjectKey());
+            return;
+        }
+
+        MediaOrigin originType;
+        try {
+            originType = MediaOrigin.valueOf("AI_" + type);
+        } catch (IllegalArgumentException e) {
+            log.error("[ AI ] 지원하지 않는 AI 생성 타입입니다. Type: {}", type);
+            return;
+        }
+
+        String aiFileName = FileNameUtils.addSuffixBeforeExtension(parentMedia.getFileName(), "(" + type + ")");
 
         Media aiMedia = Media.builder()
                 .user(parentMedia.getUser())
@@ -156,7 +170,7 @@ public class MediaService {
                 .fileType(request.fileType())
                 .fileSize(request.fileSize())
                 .resolution(request.resolution())
-                .originType(MediaOrigin.AI_GENERATED)
+                .originType(originType)
                 .parentMedia(parentMedia)
                 .build();
 

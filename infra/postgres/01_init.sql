@@ -26,7 +26,15 @@ CREATE TYPE media_type_enum AS ENUM (
 
 CREATE TYPE media_origin_enum AS ENUM (
     'ORIGINAL', 
-    'AI_GENERATED'
+    'AI_RP',
+    'AI_SUNSET',
+    'AI_DAWN',
+    'AI_AFTERNOON',
+    'AI_NIGHT',
+    'AI_RP_SUNSET',
+    'AI_RP_DAWN',
+    'AI_RP_AFTERNOON',
+    'AI_RP_NIGHT'
 );
 
 CREATE TYPE permission_level_enum AS ENUM (
@@ -72,6 +80,14 @@ CREATE TABLE media (
     origin_type media_origin_enum NOT NULL
 );
 
+CREATE TABLE musics (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
+    music_name VARCHAR(255) NOT NULL,
+    music_url VARCHAR(500) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
 CREATE TABLE devices (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -82,6 +98,7 @@ CREATE TABLE devices (
     mode_status device_mode_enum DEFAULT 'AUTO_MODE' NOT NULL,
     mode_settings JSONB NULL,
     media_id BIGINT NULL REFERENCES media(id) ON DELETE SET NULL,
+    music_id BIGINT NULL REFERENCES musics(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -127,6 +144,7 @@ CREATE TABLE user_device_permissions (
 CREATE INDEX idx_devices_user_id ON devices (user_id);
 CREATE INDEX idx_media_user_id ON media (user_id);
 CREATE INDEX idx_media_parent_media_id ON media (parent_media_id);
+CREATE INDEX idx_musics_user_id ON musics (user_id);
 CREATE INDEX idx_alarms_device_id ON alarms (device_id);
 CREATE INDEX idx_user_social_accounts_user_id ON user_social_accounts (user_id);
 CREATE INDEX idx_mobiles_user_id ON mobiles (user_id);

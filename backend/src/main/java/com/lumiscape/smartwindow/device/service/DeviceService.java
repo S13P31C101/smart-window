@@ -11,6 +11,8 @@ import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.service.MediaService;
+import com.lumiscape.smartwindow.music.domain.Music;
+import com.lumiscape.smartwindow.music.service.MusicService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 
 import com.lumiscape.smartwindow.user.service.UserService;
@@ -36,13 +38,18 @@ public class DeviceService {
     private final UserService userService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
-    private final FcmNotificationService fcmNotificationService;
 
     private MediaService mediaService;
+    private MusicService musicService;
 
     @Autowired
     public void setMediaService(@Lazy MediaService mediaService) {
         this.mediaService = mediaService;
+    }
+
+    @Autowired
+    public void setMusicService(@Lazy MusicService musicService) {
+        this.musicService = musicService;
     }
 
     public List<DeviceDetailResponse> getMyDevice(Long userId) {
@@ -168,37 +175,40 @@ public class DeviceService {
     }
 
     @Transactional
+    public DeviceDetailResponse updateDeviceMusic(Long userId, Long deviceId, Long musicId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        Music music = null;
+        if (musicId != null) {
+            music = musicService.findMusicByUser(musicId, userId);
+        }
+
+        device.updateMusic(music);
+
+        publishMusicUpdateToDevice(device);
+
+        return DeviceDetailResponse.from(device);
+    }
+
+    @Transactional
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
         Device device = findByDeviceUniqueId(deviceUniqueId);
-        User user = device.getUser(); // 디바이스와 연결된 사용자 정보를 가져옵니다.
-        if (user == null) {
-            log.warn("Device {} has no associated user. Skipping FCM notification.", deviceUniqueId);
-            return;
-        }
-
-        String title = "스마트윈도우 알림";
-        String body = "";
 
         switch (statusType) {
             case "power":
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
-                body = device.getDeviceName() + " 전원이 " + (power ? "켜졌습니다." : "꺼졌습니다.");
-                fcmNotificationService.sendNotification(user.getId(), title, body);
+                // TODO FCM
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
                 device.updateOpen(open);
-                body = device.getDeviceName() + " 창문이 " + (open ? "열렸습니다." : "닫혔습니다.");
-                fcmNotificationService.sendNotification(user.getId(), title, body);
+                // TODO FCM
                 break;
             case "sensor":
-                // TODO: 센서 값에 따른 알림 조건 및 내용 정의 필요
-                // 예를 들어, 특정 값 이상일 때만 알림을 보낼 수 있습니다.
-                // body = "새로운 센서 데이터가 감지되었습니다: " + payload;
-                // fcmNotificationService.sendNotification(user.getId(), title, body);
+                // TODO FCM
                 break;
         }
     }
@@ -233,5 +243,21 @@ public class DeviceService {
         Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
 
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
+    }
+
+    public void publishMusicUpdateToDevice(Device device) {
+        Music music = device.getMusic();
+
+        Long musicId = null;
+        String musicUrl = null;
+
+        if (music != null) {
+            musicId = music.getId();
+            musicUrl = music.getMusicUrl();
+        }
+
+        Map<String, Object> payload = Map.of("musicId", musicId, "musicUrl", musicUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
 }
