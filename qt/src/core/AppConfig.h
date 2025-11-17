@@ -4,6 +4,7 @@
 #include <QString>
 #include <QJsonObject>
 #include <QSize>
+#include <QVariantMap>
 
 /**
  * @brief Application configuration manager
@@ -27,6 +28,8 @@ class AppConfig : public QObject
     Q_PROPERTY(QString applicationDirPath READ applicationDirPath CONSTANT)
     Q_PROPERTY(QString currentMediaUrl READ currentMediaUrl WRITE setCurrentMediaUrl NOTIFY currentMediaUrlChanged)
     Q_PROPERTY(QString currentYoutubeUrl READ currentYoutubeUrl WRITE setCurrentYoutubeUrl NOTIFY currentYoutubeUrlChanged)
+    Q_PROPERTY(QString glassModeBackgroundMusic READ glassModeBackgroundMusic NOTIFY configChanged)
+    Q_PROPERTY(QVariantMap autoModeBackgroundMusic READ autoModeBackgroundMusic NOTIFY configChanged)
 
 public:
     explicit AppConfig(QObject *parent = nullptr);
@@ -76,6 +79,9 @@ public:
     QString currentMediaUrl() const { return m_currentMediaUrl; }
     QString currentYoutubeUrl() const { return m_currentYoutubeUrl; }
 
+    QString glassModeBackgroundMusic() const { return m_glassModeBackgroundMusic; }
+    QVariantMap autoModeBackgroundMusic() const { return m_autoModeBackgroundMusic; }
+
     // Setters
     void setGestureEnabled(bool enabled);
     void setCurrentMediaUrl(const QString &url);
@@ -124,4 +130,8 @@ private:
     // Media
     QString m_currentMediaUrl;
     QString m_currentYoutubeUrl;
+
+    // Background Music
+    QString m_glassModeBackgroundMusic;
+    QVariantMap m_autoModeBackgroundMusic;
 };

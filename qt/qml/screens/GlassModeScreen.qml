@@ -14,24 +14,8 @@ Item {
     property bool showSpotify: true  // Changed to true - show by default when authenticated
     property bool showQuote: false
 
-    // Auto-play when Spotify widget is shown
-    onShowSpotifyChanged: {
-        if (showSpotify && spotifyProvider.authenticated) {
-            console.log("Spotify widget toggled ON - attempting to resume playback")
-            spotifyProvider.play()
-        }
-    }
-
-    // Show Spotify widget automatically when track data is available
-    Connections {
-        target: spotifyProvider
-        function onTrackChanged() {
-            if (spotifyProvider.authenticated && spotifyProvider.trackName && !showSpotify) {
-                console.log("Track detected - showing Spotify widget automatically")
-                showSpotify = true
-            }
-        }
-    }
+    // Background music from config
+    property string backgroundMusicUrl: appConfig.glassModeBackgroundMusic
 
     // Transparent glass effect background
     Rectangle {
@@ -66,12 +50,21 @@ Item {
         }
     }
 
-    // ====== 하단 위젯 영역 (Spotify 중앙) ======
-    SpotifyWidget {
+    // ====== 하단 위젯 영역 (YouTube Background Music) ======
+    YouTubePlayer {
+        id: youtubePlayer
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: root.height * 0.08
-        visible: showSpotify
+        visible: showSpotify && root.backgroundMusicUrl !== ""
+
+        youtubeUrl: root.backgroundMusicUrl
+        width: Math.min(parent.width * 0.45, 500)  // Compact size
+        height: 160
+
+        onPlayerReady: {
+            console.log("Background music player ready in Glass Mode")
+        }
     }
 
     // ====== 위젯 토글 버튼 (우측 중앙) - Gesture controlled ======

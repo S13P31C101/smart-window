@@ -36,6 +36,9 @@
         <file>../assets/presets/widgets.json</file>
         <file>../assets/presets/auto_scenes.json</file>
 
+        <!-- Logos and Icons -->
+        <file>../assets/fonts/Youtube_logo.png</file>
+
         <!-- Scene Images -->
         <file>../assets/images/scenes/default.png</file>
 

@@ -8,25 +8,20 @@
   "deviceUniqueId": "",
 
   "mqtt": {
-    "host": "localhost",
-    "port": 1883,
+    "host": "",
+    "port": 1234,
     "username": "",
     "password": "",
-    "clientId": "lumiscape_client"
+    "clientId": "",
+    "useTls": true
   },
 
   "apis": {
     "weather": {
-      "apiKey": "MY-WEATHER-KEY",
+      "apiKey": "",
       "apiUrl": "https://api.openweathermap.org/geo/1.0/direct",
-      "defaultCity": "Seoul",
+      "defaultCity": "Gwangju",
       "updateIntervalMinutes": 10
-    },
-    "spotify": {
-      "clientId": "MY-SPOTIFY-CLIENT-ID",
-      "clientSecret": "MY-SPOTIFY-CLIENT-SECRET",
-      "redirectUri": "http://127.0.0.1:8888/callback",
-      "scopes": "user-read-playback-state user-modify-playback-state"
     }
   },
 
@@ -72,6 +67,16 @@
     "auto": {
       "weatherBasedRecommendations": true,
       "timeBasedRecommendations": true
+    }
+  },
+
+  "backgroundMusic": {
+    "glass": "https://www.youtube.com/watch?v=FCdKgHco1_4",
+    "auto": {
+      "mapleworld": "https://www.youtube.com/watch?v=-FMHYjqC4iA",
+      "paris": "https://www.youtube.com/watch?v=831FwSx3pB0",
+      "uyuni": "https://www.youtube.com/watch?v=mQLJzQnfC0A&t=1242s",
+      "island": "https://www.youtube.com/watch?v=RjTPKlKPM3Y"
     }
   }
 }
