@@ -1,184 +1,82 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException,Body,BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
-import io
-import utils  # 위의 utils.py에 모든 부속 함수 포함되어 있다고 가정
-import httpx
 import os
+import io
+import uuid
+import asyncio
+from fastapi import FastAPI, Body, HTTPException
+from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from PIL import Image
-from huggingface_hub import login
+import utils
 
 load_dotenv()
 app = FastAPI()
-#login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
 
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-@app.post("/api/v1/ai/remove-person")
-async def remove_person_and_upload(request: dict = Body(...), background_tasks: BackgroundTasks = None):
-    media_id = request.get("mediaId")
-    download_url = request.get("downloadUrl")
-    target_s3_key = request.get("targetAIS3Key")
-    if not media_id or not download_url or not target_s3_key:
-        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, and targetAIS3Key are required")
+# 작업 큐와 결과 저장소
+task_queue = asyncio.Queue()
+task_results = {}
 
-    # --- BackgroundJob 정의 (완전 동기 함수) ---
-    def background_job(media_id, download_url, target_s3_key):
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(api_worker())
+
+async def api_worker():
+    while True:
+        # (task_id, task_type, request_data) 구조로 수신
+        task_id, task_type, req = await task_queue.get()
         try:
-            # 1. 원본 이미지 다운로드
-            image = utils.sync_download_image(download_url)  # sync 버전 필요
-            height, width = image.shape[:2]
-            mask = utils.np.zeros((height, width), utils.np.uint8)
-            # 2. YOLO로 사람 탐지 후 마스크 생성
-            results = utils.yolo_model.predict(image)
-            for r in results:
-                for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
-                    if int(cls) == 0:
-                        box_expanded = utils.expand_box(box, image.shape, scale=0.1)
-                        x1, y1, x2, y2 = map(int, box_expanded)
-                        mask[y1:y2, x1:x2] = 255
-            # 3. 인페인팅
-            inpainted_image = utils.sync_inpaint_image(image, mask)  # sync 버전 필요
-            buffer = io.BytesIO()
-            inpainted_image.save(buffer, format="PNG")
-            buffer.seek(0)
-            # 4. BE에 AI 업로드 URL 요청
-            ai_upload_data = utils.sync_request_ai_upload_url(target_s3_key)
-            if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-                raise Exception("S3 object key mismatch or missing in AI upload URL response")
-            file_url = ai_upload_data.get("fileUrl")
-            if not file_url:
-                raise Exception("fileUrl missing in AI upload URL response")
-            # 5. S3에 이미지 업로드
-            utils.sync_upload_to_s3(file_url, buffer)
-            # 6. AI 콜백 전송
-            utils.sync_notify_ai_callback(media_id, target_s3_key)
-            print(f"Background: {target_s3_key} 성공!")
+            if task_type == 'remove-person':
+                result = utils.handle_remove_person(req)
+            elif task_type == 'recommend-music':
+                result = await utils.handle_recommend_music(req)
+            elif task_type == 'scene-blend':
+                result = await utils.handle_scene_blend(req)
+            elif task_type == 'generate-dalle-image':
+                result = await utils.handle_generate_dalle_image(req)
+            else:
+                result = {"success": False, "error": f"Unknown task type: {task_type}"}
+            task_results[task_id] = result
         except Exception as e:
-            print("BackgroundTask 실패:", e)
+            task_results[task_id] = {"success": False, "error": str(e)}
+        finally:
+            task_queue.task_done()
 
-    # 백그라운드 태스크로 실행
-    background_tasks.add_task(background_job, media_id, download_url, target_s3_key)
-    # 빠른 응답
-    return JSONResponse(content={"success": True, "message": "Person removal started. You will be notified when it is done."})
+# ----------- API 엔드포인트 정의 ------------
+
+@app.post("/api/v1/ai/remove-person")
+async def remove_person_and_upload(request: dict = Body(...)):
+    task_id = str(uuid.uuid4())
+    await task_queue.put((task_id, "remove-person", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict = Body(...)):
-    download_url = request.get("downloadUrl")
-    if not download_url:
-        raise HTTPException(status_code=400, detail="downloadUrl is required")
-
-    # 1. 외부 이미지 다운로드
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(download_url)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to download image")
-        image_bytes = resp.content    # <-- 변경 포인트
-
-    # 2. 키워드 추출
-    caption = utils.extract_mood_caption(image_bytes)  # <-- 변경 포인트 (비동기 아님)
-    # 만약 extract_mood_caption이 동기라면 await 삭제
-
-    # 3. 음악 추천
-    result = await utils.search_youtube_music(caption + " piano music")
-    if result:
-        return {
-            "success": True,
-            "message": f"Found song '{result['title']}'",
-            "youtube_url": result["url"],
-            "mood_caption": caption
-        }
-    else:
-        return {
-            "success": False,
-            "message": "No matching music found.",
-            "mood_caption": caption
-        }
-
-
-
+    task_id = str(uuid.uuid4())
+    await task_queue.put((task_id, "recommend-music", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/scene-blend")
-async def removehuman_scene_and_upload(request: dict):
-    media_id = request.get("mediaId")
-    download_url = request.get("downloadUrl")
-    target_s3_key = request.get("targetAIS3Key")
-    scene_type = request.get("sceneType", "night").lower().strip()  # 기본값 night
-
-    if not media_id or not download_url or not target_s3_key or not scene_type:
-        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, sceneType, and targetAIS3Key are required")
-
-    try:
-        # 1. 원본 이미지 다운로드 (np.ndarray, BGR)
-        image = await utils.download_image(download_url)
-        height, width = image.shape[:2]
-
-        # 2. SegFormer로 하늘 마스크 추출 (scene-blend 재활용)
-        sky_mask = await utils.sky_mask_segformer(image)
-
-        # 3. sceneType별 프롬프트
-        prompt = utils.get_scene_prompt(scene_type)
-
-        # 4. inpaint(하늘 마스크에 프롬프트 적용, removehuman이지만 사실상 sky inpainting)
-        inpainted_image = utils.inpaint_image_with_prompt(image, sky_mask, prompt, mask_is_sky=True)
-
-        # 5. 결과 버퍼 준비
-        buffer = io.BytesIO()
-        inpainted_image.save(buffer, format="PNG")
-        buffer.seek(0)
-
-        # 6. S3 presigned 업로드 URL 요청
-        ai_upload_data = await utils.request_ai_upload_url(target_s3_key)
-        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-            raise HTTPException(status_code=500, detail="S3 object key mismatch or missing in AI upload URL response")
-        file_url = ai_upload_data.get("fileUrl")
-        if not file_url:
-            raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
-        # 7. S3에 업로드
-        await utils.upload_to_s3(file_url, buffer)
-
-        # 8. AI 콜백
-        await utils.notify_ai_callback(media_id, target_s3_key)
-
-        return JSONResponse(content={
-            "success": True,
-            "message": f"Sky region inpainted as {scene_type} and uploaded to S3.",
-            "result_s3_key": target_s3_key,
-            "result_s3_url": file_url
-        })
-    except HTTPException as he:
-        return JSONResponse(content={"success": False, "error": he.detail}, status_code=he.status_code)
-    except Exception as e:
-        tb = utils.traceback.format_exc()
-        print(tb)
-        return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
+async def scene_blend(request: dict = Body(...)):
+    task_id = str(uuid.uuid4())
+    await task_queue.put((task_id, "scene-blend", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
-    prompt = request.get("prompt")
-    if not prompt or not isinstance(prompt, str):
-        raise HTTPException(status_code=400, detail="prompt is required as non-empty text.")
-    try:
-        img_url = await utils.gms_dalle_generate_image(prompt)
-        # -- 이미지 다운로드 (바이너리) --
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.get(img_url)
-            if resp.status_code != 200:
-                raise RuntimeError("이미지 다운로드 실패")
-            img_bytes = resp.content
-        # -- PNG/JPEG로 변환 및 스트림 반환 --
-        buf = io.BytesIO(img_bytes)
-        try:
-            # PIL로 열어서, 다시 PNG로 변환(혹시 원본이 JPEG일 경우)
-            img = Image.open(buf)
-            out_buf = io.BytesIO()
-            img.save(out_buf, format="PNG")
-            out_buf.seek(0)
-            return StreamingResponse(out_buf, media_type="image/png")
-        except Exception:
-            # 그냥 원본 바이너리 반환 (이미 PNG라면 그대로)
-            buf.seek(0)
-            return StreamingResponse(buf, media_type="image/png")
-    except Exception as e:
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+    task_id = str(uuid.uuid4())
+    await task_queue.put((task_id, "generate-dalle-image", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.get("/api/v1/ai/result")
+async def get_task_result(task_id: str):
+    if task_id not in task_results:
+        return JSONResponse(content={"success": False, "error": "Result not ready or invalid task_id"}, status_code=404)
+    result = task_results[task_id]
+    # Streaming 방식 결과(maybe image/video) 처리:
+    if isinstance(result, dict) and result.get("stream"):
+        resp = result["stream"]
+        return StreamingResponse(resp, media_type=result["media_type"])
+    else:
+        return JSONResponse(content=result)
