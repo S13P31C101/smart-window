@@ -43,6 +43,7 @@ ApplicationWindow {
                 case "privacy": return "screens/PrivacyModeScreen.qml"
                 case "auto": return "screens/AutoModeScreen.qml"
                 case "standby": return "screens/StandbyScreen.qml"
+                case "alarm": return "screens/AlarmScreen.qml"
                 default: return "screens/LoadingScreen.qml"
             }
         }

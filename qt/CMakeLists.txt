@@ -67,6 +67,8 @@ set(PROJECT_SOURCES
     src/core/RestClient.cpp
     src/core/SensorBus.h
     src/core/SensorBus.cpp
+    src/core/AlarmManager.h
+    src/core/AlarmManager.cpp
 
     # Widgets
     src/widgets/WidgetRegistry.h
@@ -110,6 +112,7 @@ set(PROJECT_QML_FILES
     qml/screens/PrivacyModeScreen.qml
     qml/screens/AutoModeScreen.qml
     qml/screens/StandbyScreen.qml
+    qml/screens/AlarmScreen.qml
 
     # Components
     qml/components/GestureCursor.qml

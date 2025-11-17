@@ -13,6 +13,7 @@
 #include "core/MqttClient.h"
 #include "core/RestClient.h"
 #include "core/SensorBus.h"
+#include "core/AlarmManager.h"
 #include "widgets/WidgetRegistry.h"
 #include "widgets/ClockProvider.h"
 #include "widgets/WeatherProvider.h"
@@ -86,9 +87,56 @@ int main(int argc, char *argv[])
         config.mqttUseTls()
     );
 
+    // ========================================================================
+    // Alarm Manager Setup
+    // ========================================================================
+
+    auto alarmManager = new AlarmManager(&app);
+    alarmManager->initialize("alarms.json");
+
+    // Connect alarm manager MQTT publish requests to MQTT client
+    QObject::connect(alarmManager, &AlarmManager::publishMqttRequest,
+                     &mqttClient, [&mqttClient](const QString &topic, const QString &payload) {
+        mqttClient.publish(topic, payload, 1);
+    });
+
+    // When alarm is triggered, navigate to alarm screen
+    QObject::connect(alarmManager, &AlarmManager::alarmTriggered,
+                     &router, [&router](const QVariantMap &alarm) {
+        Q_UNUSED(alarm)
+        qInfo() << "Navigating to alarm screen...";
+        router.navigateTo("alarm");
+    });
+
+    // Handle alarm list messages (JSON array) - for messageReceived signal
+    QObject::connect(&mqttClient, &MqttClient::messageReceived,
+                     [alarmManager](const QString &topic, const QString &message) {
+        // Check if this is an alarm command topic
+        if (topic.contains("/command/alarm")) {
+            qInfo() << "Received raw alarm message on topic:" << topic;
+
+            // Try to parse as JSON array (alarm list)
+            QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
+            if (doc.isArray()) {
+                qInfo() << "Processing alarm list (array format)";
+                QJsonArray array = doc.array();
+                QVariantList alarmList;
+
+                for (const QJsonValue &val : array) {
+                    if (val.isObject()) {
+                        alarmList.append(val.toObject().toVariantMap());
+                    }
+                }
+
+                alarmManager->handleAlarmList(alarmList);
+            }
+            // If not an array, it will be handled by jsonMessageReceived
+        }
+    });
+
     // Simple MQTT message handler for testing
     QObject::connect(&mqttClient, &MqttClient::jsonMessageReceived,
-                     [&config, &router, &mediaPipeClient, pdlcController, windowController](const QString &topic, const QVariantMap &data) {
+                     [&config, &router, &mediaPipeClient, pdlcController, windowController, alarmManager](const QString &topic, const QVariantMap &data) {
         qInfo() << "========================================";
         qInfo() << "MQTT Message Received!";
         qInfo() << "Topic:" << topic;
@@ -243,6 +291,29 @@ int main(int argc, char *argv[])
                 // Auto navigate to custom mode to play the music
                 router.navigateTo("custom");
             }
+            else if (command == "alarm") {
+                qInfo() << ">>> Alarm command received!";
+
+                // Check if this is a single alarm object or an array
+                if (data.contains("action")) {
+                    // Single alarm with action (UPSERT or DELETE)
+                    QString action = data["action"].toString();
+                    QVariantMap alarmData = data["alarm"].toMap();
+
+                    qInfo() << "    Action:" << action;
+                    qInfo() << "    Alarm ID:" << alarmData["alarmId"].toLongLong();
+
+                    if (action == "UPSERT") {
+                        alarmManager->handleAlarmUpsert(alarmData);
+                    } else if (action == "DELETE") {
+                        alarmManager->handleAlarmDelete(alarmData);
+                    }
+                } else {
+                    // Direct alarm list (array in root level)
+                    // This happens when backend sends alarm list directly
+                    qWarning() << "Received alarm data without action field";
+                }
+            }
         }
     });
 
@@ -354,6 +425,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("restClient", &restClient);
     engine.rootContext()->setContextProperty("sensorBus", &sensorBus);
     engine.rootContext()->setContextProperty("widgetRegistry", &widgetRegistry);
+    engine.rootContext()->setContextProperty("alarmManager", alarmManager);
 
     // Individual widget providers for direct access
     engine.rootContext()->setContextProperty("clockProvider", clockProvider);
@@ -394,13 +466,16 @@ int main(int argc, char *argv[])
     QString commandTopic = QString("/devices/%1/command/#").arg(deviceId);
 
     // Wait a bit for MQTT connection to establish, then subscribe
-    QTimer::singleShot(2000, [&mqttClient, commandTopic, deviceId]() {
+    QTimer::singleShot(2000, [&mqttClient, commandTopic, deviceId, alarmManager]() {
         if (mqttClient.isConnected()) {
             mqttClient.subscribe(commandTopic, 1);
             qInfo() << "========================================";
             qInfo() << "Device ID:" << deviceId;
             qInfo() << "Subscribed to backend commands:" << commandTopic;
             qInfo() << "========================================";
+
+            // Request all alarms from backend
+            alarmManager->requestAlarmsFromBackend(deviceId);
         } else {
             qWarning() << "MQTT not connected yet, will retry subscription...";
             // The auto-reconnect will handle this
@@ -409,10 +484,13 @@ int main(int argc, char *argv[])
 
     // Also subscribe when connection is established (for reconnection scenarios)
     QObject::connect(&mqttClient, &MqttClient::connectionStateChanged,
-                     [&mqttClient, commandTopic, deviceId](bool connected) {
+                     [&mqttClient, commandTopic, deviceId, alarmManager](bool connected) {
         if (connected) {
             mqttClient.subscribe(commandTopic, 1);
             qInfo() << "Device" << deviceId << "subscribed to:" << commandTopic;
+
+            // Request all alarms from backend on reconnect
+            alarmManager->requestAlarmsFromBackend(deviceId);
         }
     });
 
