@@ -61,7 +61,8 @@ async def search_youtube_music(query: str):
         "type": "video",
         "videoCategoryId": "10",
         "maxResults": 1,
-        "key": YOUTUBE_API_KEY
+        "key": YOUTUBE_API_KEY,
+        "videoDuration": "medium"  # or "long"
     }
     async with httpx.AsyncClient() as client:
         r = await client.get(YOUTUBE_SEARCH_URL, params=params)
