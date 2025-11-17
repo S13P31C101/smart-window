@@ -8,9 +8,22 @@ Item {
     id: root
 
     width: Window.window ? Window.window.width * 0.5 : 540
-    height: Window.window ? Window.window.height * 0.08 : 80
+    height: Window.window ? Window.window.height * 0.045 : 45
 
-    // Main content - horizontal layout (no box)
+    // Background box - semi-transparent gray with no border
+    Rectangle {
+        id: backgroundBox
+        anchors.fill: parent
+        anchors.leftMargin: -Window.window ? Window.window.width * 0.03 : -32
+        anchors.rightMargin: -Window.window ? Window.window.width * 0.03 : -32
+        anchors.topMargin: -Window.window ? Window.window.height * 0.005 : -5
+        anchors.bottomMargin: -Window.window ? Window.window.height * 0.005 : -5
+        color: Qt.rgba(0.5, 0.5, 0.5, 0.6) // Gray with 60% opacity
+        radius: 16
+        border.width: 0
+    }
+
+    // Main content - horizontal layout
     Row {
         anchors.centerIn: parent
         spacing: Window.window ? Window.window.width * 0.025 : 27
@@ -19,7 +32,7 @@ Item {
         Text {
             id: weatherIcon
             text: getWeatherIcon(weatherProvider.condition)
-            font.pixelSize: Window.window ? Window.window.width * 0.04 : 43
+            font.pixelSize: Window.window ? Window.window.width * 0.03 : 32
             anchors.verticalCenter: parent.verticalCenter
 
             // Gentle pulse animation
@@ -30,10 +43,10 @@ Item {
             }
         }
 
-        // Temperature - bold and prominent
+        // Temperature - bold and prominent (keep current size)
         Text {
             text: weatherProvider.temperature
-            font.pixelSize: Window.window ? Window.window.width * 0.032 : 35
+            font.pixelSize: Window.window ? Window.window.width * 0.022 : 24
             font.weight: Font.Bold
             color: "#ffffff"
             anchors.verticalCenter: parent.verticalCenter
@@ -50,7 +63,7 @@ Item {
         // Weather condition
         Text {
             text: weatherProvider.condition
-            font.pixelSize: Window.window ? Window.window.width * 0.018 : 19
+            font.pixelSize: Window.window ? Window.window.width * 0.016 : 17
             font.weight: Font.Medium
             color: Qt.rgba(1, 1, 1, 0.9)
             anchors.verticalCenter: parent.verticalCenter
@@ -63,14 +76,14 @@ Item {
 
             Text {
                 text: "📍"
-                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
+                font.pixelSize: Window.window ? Window.window.width * 0.013 : 14
                 opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: weatherProvider.city
-                font.pixelSize: Window.window ? Window.window.width * 0.015 : 16
+                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
                 font.weight: Font.Medium
                 color: Qt.rgba(1, 1, 1, 0.8)
                 anchors.verticalCenter: parent.verticalCenter
@@ -99,7 +112,7 @@ Item {
 
             Text {
                 text: weatherProvider.humidity + "%"
-                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
+                font.pixelSize: Window.window ? Window.window.width * 0.013 : 14
                 color: Qt.rgba(1, 1, 1, 0.75)
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -119,7 +132,7 @@ Item {
 
             Text {
                 text: weatherProvider.windSpeed.toFixed(1) + " m/s"
-                font.pixelSize: Window.window ? Window.window.width * 0.014 : 15
+                font.pixelSize: Window.window ? Window.window.width * 0.013 : 14
                 color: Qt.rgba(1, 1, 1, 0.75)
                 anchors.verticalCenter: parent.verticalCenter
             }

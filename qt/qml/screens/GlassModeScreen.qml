@@ -45,7 +45,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: root.height * 0.12
-        spacing: 20
+        spacing: root.height * 0.035
 
         // 시계 위젯
         ClockWidget {
@@ -108,25 +108,31 @@ Item {
                 shadowColor: "#000000"
             }
 
-            // Icon and label in a row
-            Row {
+            // Icon and label in a column for better centering
+            Column {
                 anchors.centerIn: parent
-                spacing: 8
+                spacing: 4
+                width: toggleButton.width - 16  // Leave padding on both sides
 
                 Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.horizontalCenter: parent.horizontalCenter
                     text: icon
-                    font.pixelSize: toggleButton.height * 0.4  // Larger icon
+                    font.pixelSize: Math.min(toggleButton.height * 0.35, toggleButton.width * 0.2)  // Responsive icon size
                     opacity: toggleButton.isActive ? 1.0 : 0.7
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.horizontalCenter: parent.horizontalCenter
                     text: label
-                    font.pixelSize: toggleButton.height * 0.28  // Text size
+                    font.pixelSize: Math.min(toggleButton.height * 0.22, toggleButton.width * 0.12)  // Responsive text size
                     font.weight: Font.Medium
                     color: "#000000"
                     opacity: toggleButton.isActive ? 1.0 : 0.7
+                    elide: Text.ElideRight  // Truncate with ellipsis if too long
+                    maximumLineCount: 1  // Single line only
+                    width: parent.width  // Full width for centering
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
 

@@ -8,7 +8,7 @@ Item {
     id: root
 
     width: Window.window ? Window.window.width * 0.8 : 800
-    height: Window.window ? Window.window.height * 0.12 : 120
+    height: Window.window ? Window.window.height * 0.07 : 70
 
     property var quotes: [
         { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
@@ -68,7 +68,7 @@ Item {
     // Minimal and elegant design
     Column {
         anchors.centerIn: parent
-        spacing: Window.window ? Window.window.height * 0.015 : 15
+        spacing: Window.window ? Window.window.height * 0.010 : 10
         width: parent.width * 0.9
 
         // Decorative line above
