@@ -38,5 +38,33 @@
 
         <!-- Scene Images -->
         <file>../assets/images/scenes/default.png</file>
+
+        <!-- Mapleworld Scene Images -->
+        <file>../assets/images/scenes/mapleworld/dawn_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/morning_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/daytime_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/evening_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/night_maple.png</file>
+
+        <!-- Paris Scene Images -->
+        <file>../assets/images/scenes/paris/dawn_paris.png</file>
+        <file>../assets/images/scenes/paris/morning_paris.png</file>
+        <file>../assets/images/scenes/paris/daytime_paris.png</file>
+        <file>../assets/images/scenes/paris/evening_paris.png</file>
+        <file>../assets/images/scenes/paris/night_paris.png</file>
+
+        <!-- Uyuni Scene Images -->
+        <file>../assets/images/scenes/uyuni/dawn_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/morning_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/daytime_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/evening_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/night_uyuni.png</file>
+
+        <!-- Island Scene Images -->
+        <file>../assets/images/scenes/island/dawn_island.png</file>
+        <file>../assets/images/scenes/island/morning_island.png</file>
+        <file>../assets/images/scenes/island/daytime_island.png</file>
+        <file>../assets/images/scenes/island/evening_island.png</file>
+        <file>../assets/images/scenes/island/night_island.png</file>
     </qresource>
 </RCC>
