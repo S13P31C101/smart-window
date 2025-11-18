@@ -25,11 +25,13 @@ async def startup_event():
 
 async def api_worker():
     while True:
-        # (task_id, task_type, request_data) 구조로 수신
         task_id, task_type, req = await task_queue.get()
+        print(f"[WORKER] Handling task {task_id} type={task_type}")
         try:
             if task_type == 'remove-person':
-                result = utils.handle_remove_person(req)
+                # 동기 작업이므로 run_in_executor로 처리
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, utils.handle_remove_person, req)
             elif task_type == 'recommend-music':
                 result = await utils.handle_recommend_music(req)
             elif task_type == 'scene-blend':
@@ -39,6 +41,7 @@ async def api_worker():
             else:
                 result = {"success": False, "error": f"Unknown task type: {task_type}"}
             task_results[task_id] = result
+            print(f"[WORKER] Task {task_id} completed: {result.get('success')}")
         except Exception as e:
             task_results[task_id] = {"success": False, "error": str(e)}
         finally:
@@ -68,6 +71,8 @@ async def scene_blend(request: dict = Body(...)):
     print(json.dumps(request, indent=2))  # 보기 좋게 출력!
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "scene-blend", request))
+    print("[MODEL] scene blend inpainted, uploading...")
+
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/generate-dalle-image")
