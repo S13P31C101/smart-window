@@ -1,6 +1,5 @@
 package com.lumiscape.smartwindow.device.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
@@ -10,6 +9,7 @@ import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
+import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.service.MediaService;
 import com.lumiscape.smartwindow.music.domain.Music;
 import com.lumiscape.smartwindow.music.service.MusicService;
@@ -171,6 +171,21 @@ public class DeviceService {
         publishMediaUpdateToDevice(device);
 
         return DeviceDetailResponse.from(device);
+    }
+
+    @Transactional
+    public void deleteDevicesMedia(Long userId, Long mediaId) {
+        Media media = mediaService.findMediaByUser(mediaId, userId);
+
+        List<Device> affectedDevices = findByAllMedia(media);
+
+        Media replacementMedia = (media.getOriginType() != MediaOrigin.ORIGINAL && media.getParentMedia() != null)
+                ? media.getParentMedia() : null;
+
+        for (Device device : affectedDevices) {
+            device.updateMedia(replacementMedia);
+            publishMediaUpdateToDevice(device);
+        }
     }
 
     @Transactional
