@@ -4,7 +4,7 @@
 #include <QQuickStyle>
 #include <QIcon>
 #include <QTimer>
-#include <QtWebEngineQuick/QtWebEngineQuick>
+// #include <QtWebEngineQuick/QtWebEngineQuick> -> Don't use at rasp
 
 #include "core/AppConfig.h"
 #include "core/Router.h"
@@ -21,7 +21,7 @@
 // #include "widgets/SpotifyProvider.h"
 // #include "widgets/SpotifyWebBridge.h"
 // #include "integrations/SpotifyAuthHelper.h"
-// #include "widgets/YouTubeProvider.h"  // Removed: using WebEngine-based QML player instead
+#include "widgets/YouTubeProvider.h"
 #include "widgets/SensorManager.h"
 #include "hardware/PDLCController.h"
 #include "hardware/WindowController.h"
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     // ========================================================================
     // WebEngine Initialization (must be called before QGuiApplication)
     // ========================================================================
-    QtWebEngineQuick::initialize();
+    // QtWebEngineQuick::initialize(); -> Don't use at rasp
 
     // ========================================================================
     // Application Setup
@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
                 }
             }
             else if (command == "mode") {
-                QString mode = data["mode"].toString();
+                QString mode = data["status"].toString();
                 qInfo() << ">>> Mode command received! Mode:" << mode;
 
                 // ========================================
@@ -316,6 +316,30 @@ int main(int argc, char *argv[])
                     qWarning() << "Received alarm data without action field";
                 }
             }
+            else if (command == "widgets") {
+                qInfo() << ">>> Widgets command received!";
+
+                // Update widget visibility settings from payload
+                if (data.contains("widgetClock")) {
+                    config.setWidgetClock(data["widgetClock"].toBool());
+                    qInfo() << "    Clock Widget:" << data["widgetClock"].toBool();
+                }
+                if (data.contains("widgetWeather")) {
+                    config.setWidgetWeather(data["widgetWeather"].toBool());
+                    qInfo() << "    Weather Widget:" << data["widgetWeather"].toBool();
+                }
+                if (data.contains("widgetQuotes")) {
+                    config.setWidgetQuotes(data["widgetQuotes"].toBool());
+                    qInfo() << "    Quotes Widget:" << data["widgetQuotes"].toBool();
+                }
+                if (data.contains("widgetMusic")) {
+                    config.setWidgetMusic(data["widgetMusic"].toBool());
+                    qInfo() << "    Music Widget:" << data["widgetMusic"].toBool();
+                }
+
+                qInfo() << "  → Widget settings updated successfully";
+                router.navigateTo("custom");
+            }
         }
     });
 
@@ -354,7 +378,7 @@ int main(int argc, char *argv[])
     // auto spotifyProvider = new SpotifyProvider(&restClient, &app);
     // auto spotifyWebBridge = new SpotifyWebBridge(&app);
     // auto spotifyAuthHelper = new SpotifyAuthHelper(&restClient, &app);
-    // auto youtubeProvider = new YouTubeProvider(&app);  // Removed: using WebEngine-based QML player
+    auto youtubeProvider = new YouTubeProvider(&app);
 
     // Initialize WeatherProvider with API key and default city
     weatherProvider->setApiKey(config.weatherApiKey());
@@ -387,7 +411,7 @@ int main(int argc, char *argv[])
     widgetRegistry.registerWidget("weather", weatherProvider);
     // Spotify removed - using YouTube for background music
     // widgetRegistry.registerWidget("spotify", spotifyProvider);
-    // widgetRegistry.registerWidget("youtube", youtubeProvider);  // Removed: using WebEngine-based QML player
+    widgetRegistry.registerWidget("youtube", youtubeProvider);
 
     // Sensor manager for environmental monitoring
     auto sensorManager = new SensorManager(&app);
@@ -443,7 +467,7 @@ int main(int argc, char *argv[])
     // engine.rootContext()->setContextProperty("spotifyProvider", spotifyProvider);
     // engine.rootContext()->setContextProperty("spotifyWebBridge", spotifyWebBridge);
     // engine.rootContext()->setContextProperty("spotifyAuthHelper", spotifyAuthHelper);
-    // engine.rootContext()->setContextProperty("youtubeProvider", youtubeProvider);  // Removed
+    engine.rootContext()->setContextProperty("youtubeProvider", youtubeProvider);
     engine.rootContext()->setContextProperty("sensorManager", sensorManager);
     engine.rootContext()->setContextProperty("pdlcController", pdlcController);
     engine.rootContext()->setContextProperty("windowController", windowController);

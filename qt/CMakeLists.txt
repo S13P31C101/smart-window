@@ -132,7 +132,8 @@ set(PROJECT_QML_FILES
     # Spotify removed - using YouTube for background music
     # qml/widgets/SpotifyWidget.qml
     # qml/widgets/SpotifyWebPlayer.qml
-    qml/widgets/YouTubePlayer.qml
+    # qml/widgets/YouTubePlayer.qml - WebEngine is hard to be used on Rasp
+    qml/widgets/YouTubeAudioWidget.qml
     qml/widgets/QuoteWidget.qml
 
     # Styles
@@ -331,4 +332,6 @@ message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Qt Version: ${Qt6_VERSION}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Logging: ${LUMISCAPE_ENABLE_LOGGING}")
+message(STATUS "GPIO Support: ${HAVE_GPIOD}")
+message(STATUS "Bluetooth Support: ${HAVE_SIMPLEBLE}")
 message(STATUS "")

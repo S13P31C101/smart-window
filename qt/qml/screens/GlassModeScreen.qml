@@ -11,7 +11,7 @@ Item {
     // 위젯 표시 상태
     property bool showClock: true
     property bool showWeather: true
-    property bool showSpotify: true  // Changed to true - show by default when authenticated
+    property bool showYoutube: true  // Changed to true - show by default when authenticated
     property bool showQuote: false
 
     // Background music from config
@@ -50,20 +50,20 @@ Item {
         }
     }
 
-    // ====== 하단 위젯 영역 (YouTube Background Music) ======
-    YouTubePlayer {
-        id: youtubePlayer
+    // ====== 하단 위젯 영역 (YouTube Audio Player) - yt-dlp based ======
+    YouTubeAudioWidget {
+        id: youtubeAudioWidget
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: root.height * 0.08
-        visible: showSpotify && root.backgroundMusicUrl !== ""
+        visible: showYoutube && root.backgroundMusicUrl !== ""
 
         youtubeUrl: root.backgroundMusicUrl
-        width: Math.min(parent.width * 0.45, 500)  // Compact size
-        height: 160
+        width: Math.min(parent.width * 0.55, 700)
+        height: 200
 
         onPlayerReady: {
-            console.log("Background music player ready in Glass Mode")
+            console.log("YouTube audio player ready in Glass Mode")
         }
     }
 
@@ -216,8 +216,8 @@ Item {
         ToggleButton {
             icon: "🎵"
             label: "Music"
-            isActive: showSpotify
-            onClicked: showSpotify = !showSpotify
+            isActive: showYoutube
+            onClicked: showYoutube = !showYoutube
         }
 
         // 명언 토글
@@ -254,6 +254,6 @@ Item {
         color: Theme.alpha(Theme.textTertiary, 0.6)
         font.pixelSize: root.width * 0.012
         font.weight: Theme.fontWeightRegular
-        visible: !showSpotify && !showQuote
+        visible: !showYoutube && !showQuote
     }
 }
