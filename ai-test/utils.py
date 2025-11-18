@@ -78,7 +78,7 @@ async def search_youtube_music(query: str):
         "videoCategoryId": "10",        # 음악 카테고리 (실패시 주석/수정 테스트)
         "maxResults": 1,
         "key": YOUTUBE_API_KEY,
-        "videoDuration": "any"       # "any"로 완화도 가능
+        "videoDuration": "medium"       # "any"로 완화도 가능
     }
     print(f"[YOUTUBE][DEBUG] Request params: {params}")
 

@@ -123,7 +123,7 @@ async def main_worker():
 
 # --- API ---
 
-@app.post("/api/v1/ai/remove-person1")
+@app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
     print(f"[QUEUE INPUT] remove-person request (pre-download put): {json.dumps(request, indent=2)}")
     download_url = request.get("downloadUrl")
@@ -145,7 +145,7 @@ async def recommend_music(request: dict = Body(...)):
     await music_queue.put((task_id, request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
-@app.post("/api/v1/ai/scene-blend1")
+@app.post("/api/v1/ai/scene-blend")
 async def scene_blend(request: dict = Body(...)):
     print(f"[QUEUE INPUT] scene-blend request (pre-download put): {json.dumps(request, indent=2)}")
     download_url = request.get("downloadUrl")
@@ -159,7 +159,7 @@ async def scene_blend(request: dict = Body(...)):
     await main_queue.put((task_id, "scene-blend", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
-@app.post("/api/v1/ai/generate-dalle-image1")
+@app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
     print(f"[QUEUE INPUT] generate-dalle-image request: {json.dumps(request, indent=2)}")
     task_id = str(uuid.uuid4())
