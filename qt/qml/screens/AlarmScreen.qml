@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../widgets"
 
 /**
  * @brief Alarm Screen
@@ -21,6 +22,9 @@ Rectangle {
     property bool isWhite: false
     property string alarmName: alarmManager.currentAlarmName
 
+    // Background music from config
+    property string backgroundMusicUrl: "https://www.youtube.com/watch?v=F7iVmUtZNBI"
+
     // Flashing background color
     color: isWhite ? "#FFFFFF" : "#000000"
 
@@ -39,6 +43,23 @@ Rectangle {
     Behavior on color {
         ColorAnimation {
             duration: 50
+        }
+    }
+
+    // ====== 하단 위젯 영역 (YouTube Audio Player) - yt-dlp based ======
+    YouTubeAudioWidget {
+        id: youtubeAudioWidget
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.height * 0.08
+        visible: false
+
+        youtubeUrl: root.backgroundMusicUrl
+        width: Math.min(parent.width * 0.55, 700)
+        height: 200
+
+        onPlayerReady: {
+            console.log("YouTube audio player ready in Glass Mode")
         }
     }
 
