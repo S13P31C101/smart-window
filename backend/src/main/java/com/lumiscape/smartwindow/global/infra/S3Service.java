@@ -31,7 +31,7 @@ public class S3Service {
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
 
-    private static final Duration MEDIA_URL_EXPIRATION = Duration.ofMinutes(10);
+    private static final Duration MEDIA_URL_EXPIRATION = Duration.ofMinutes(30);
 
     public String generatePresignedUrlForUpload(String s3ObjectKey) {
         try {

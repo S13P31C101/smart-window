@@ -13,10 +13,11 @@ CREATE TYPE social_provider_enum AS ENUM (
 );
 
 CREATE TYPE device_mode_enum AS ENUM (
-    'AUTO_MODE', 
-    'DARK_MODE', 
-    'SLEEP_MODE',
-    'CUSTOM_MODE'
+    'MENU_MODE'
+    'CUSTOM_MODE',
+    'AUTO_MODE',
+    'PRIVACY_MODE', 
+    'GLASS_MODE'
 );
 
 CREATE TYPE media_type_enum AS ENUM (
@@ -74,6 +75,7 @@ CREATE TABLE media (
     file_url VARCHAR(500) NOT NULL,
     file_type media_type_enum NOT NULL,
     file_size BIGINT NULL,
+    bgm_url VARCHAR(500) NULL,
     resolution VARCHAR(50) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     parent_media_id BIGINT NULL REFERENCES media(id) ON DELETE CASCADE,
@@ -95,7 +97,8 @@ CREATE TABLE devices (
     device_name VARCHAR(100) NOT NULL,
     power_status BOOLEAN DEFAULT FALSE NOT NULL,
     open_status BOOLEAN DEFAULT FALSE NOT NULL,
-    mode_status device_mode_enum DEFAULT 'AUTO_MODE' NOT NULL,
+    opacity_status BOOLEAN DEFAULT FALSE NOT NULL,
+    mode_status device_mode_enum DEFAULT 'MENU_MODE' NOT NULL,
     mode_settings JSONB NULL,
     media_id BIGINT NULL REFERENCES media(id) ON DELETE SET NULL,
     music_id BIGINT NULL REFERENCES musics(id) ON DELETE SET NULL,
