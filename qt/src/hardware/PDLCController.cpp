@@ -29,8 +29,7 @@ PDLCController::PDLCController(QObject *parent)
     m_ready = gpio18_ok && gpio23_ok;
 
     if (m_ready) {
-        // Initialize to transparent state (Glass Mode default)
-        setTransparent();
+        // Initialize to opaque status - stay false
         setStatus("PDLC Controller ready");
         qInfo() << "✓ PDLC Controller initialized successfully";
     } else {

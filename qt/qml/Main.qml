@@ -11,6 +11,7 @@ ApplicationWindow {
     visible: true
     width: 1080
     height: 1920
+    visibility: ApplicationWindow.FullScreen
     title: "Lumiscape"
 
     // Use Material style with dark theme
