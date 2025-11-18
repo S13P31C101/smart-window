@@ -66,6 +66,8 @@ def extract_mood_caption(image_bytes: bytes) -> str:
     print(f"[MOOD CAPTION] Extracted: {caption}")
     return caption
 
+import json
+
 async def search_youtube_music(query: str):
     print(f"[YOUTUBE] Searching music for: {query}")
     YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
@@ -73,14 +75,20 @@ async def search_youtube_music(query: str):
         "part": "snippet",
         "q": query,
         "type": "video",
-        "videoCategoryId": "10",
+        "videoCategoryId": "10",        # 음악 카테고리 (실패시 주석/수정 테스트)
         "maxResults": 1,
         "key": YOUTUBE_API_KEY,
-        "videoDuration": "medium"
+        "videoDuration": "any"       # "any"로 완화도 가능
     }
+    print(f"[YOUTUBE][DEBUG] Request params: {params}")
+
     async with httpx.AsyncClient() as client:
         r = await client.get(YOUTUBE_SEARCH_URL, params=params)
         data = r.json()
+    print(f"[YOUTUBE][DEBUG] Response keys: {list(data.keys())}")
+    print(f"[YOUTUBE][DEBUG] items: {data.get('items')}")
+    print(f"[YOUTUBE][DEBUG] Response JSON (part): {json.dumps(data, ensure_ascii=False)[:500]}")
+
     if "items" in data and len(data["items"]) > 0:
         video_id = data["items"][0]["id"]["videoId"]
         video_title = data["items"][0]["snippet"]["title"]
@@ -88,8 +96,9 @@ async def search_youtube_music(query: str):
         print(f"[YOUTUBE] Found: {video_title}, {video_url}")
         return {"title": video_title, "url": video_url}
     else:
-        print(f"[YOUTUBE][ERROR] No matching content found.")
+        print(f"[YOUTUBE][ERROR] No matching content found. Full response: {json.dumps(data, ensure_ascii=False)}")
         return None
+
 
 async def notify_music_callback(media_id: int, device_id: str, music_url: str):
     import json
