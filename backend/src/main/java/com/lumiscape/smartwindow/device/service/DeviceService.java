@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -288,8 +289,11 @@ public class DeviceService {
             musicUrl = music.getMusicUrl();
         }
 
-        Map<String, Object> payload = Map.of("musicId", musicId, "musicUrl", musicUrl);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("musicId", musicId);
+        payload.put("musicUrl", musicUrl);
 
+        log.info("????00");
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
 }
