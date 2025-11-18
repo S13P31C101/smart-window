@@ -3,7 +3,9 @@ package com.lumiscape.smartwindow.music.service;
 import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
+import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.music.domain.Music;
+import com.lumiscape.smartwindow.music.dto.AIMusicCallbackRequest;
 import com.lumiscape.smartwindow.music.dto.MusicRegisterRequest;
 import com.lumiscape.smartwindow.music.dto.MusicResponse;
 import com.lumiscape.smartwindow.music.dto.MusicUpdateRequest;
@@ -30,6 +32,9 @@ public class MusicService {
 
     private final @Lazy DeviceService deviceService;
 
+    // TODO improve music part
+    private final MqttPublishService mqttPublishService;
+
     public List<MusicResponse> getMusicList(Long userId, String type) {
         List<Music> musics;
 
@@ -54,6 +59,7 @@ public class MusicService {
                 .user(userReference)
                 .musicName(request.musicName())
                 .musicUrl(request.musicUrl())
+                .registrantType(request.registrantType())
                 .build();
 
         Music savedMusic = musicRepository.save(music);
@@ -75,6 +81,15 @@ public class MusicService {
         Music music = findMyMusic(musicId, userId);
 
         musicRepository.delete(music);
+    }
+
+    @Transactional
+    public void handleAICallback(AIMusicCallbackRequest request) {
+        // TODO improve music part
+        Long deviceId = Long.parseLong(request.deviceId());
+        String deviceUniqueId = deviceService.findById(deviceId);
+
+        mqttPublishService.publishCommand(deviceUniqueId, "music", request.musicUrl());
     }
 
     public Music findMusicByUser(Long musicId, Long userId) {
