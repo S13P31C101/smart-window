@@ -31,6 +31,12 @@ class AppConfig : public QObject
     Q_PROPERTY(QString glassModeBackgroundMusic READ glassModeBackgroundMusic NOTIFY configChanged)
     Q_PROPERTY(QVariantMap autoModeBackgroundMusic READ autoModeBackgroundMusic NOTIFY configChanged)
 
+    // Custom Mode Widget Settings
+    Q_PROPERTY(bool widgetClock READ widgetClock WRITE setWidgetClock NOTIFY widgetClockChanged)
+    Q_PROPERTY(bool widgetWeather READ widgetWeather WRITE setWidgetWeather NOTIFY widgetWeatherChanged)
+    Q_PROPERTY(bool widgetQuotes READ widgetQuotes WRITE setWidgetQuotes NOTIFY widgetQuotesChanged)
+    Q_PROPERTY(bool widgetMusic READ widgetMusic WRITE setWidgetMusic NOTIFY widgetMusicChanged)
+
 public:
     explicit AppConfig(QObject *parent = nullptr);
     ~AppConfig() = default;
@@ -82,16 +88,30 @@ public:
     QString glassModeBackgroundMusic() const { return m_glassModeBackgroundMusic; }
     QVariantMap autoModeBackgroundMusic() const { return m_autoModeBackgroundMusic; }
 
+    // Custom Mode Widget Settings
+    bool widgetClock() const { return m_widgetClock; }
+    bool widgetWeather() const { return m_widgetWeather; }
+    bool widgetQuotes() const { return m_widgetQuotes; }
+    bool widgetMusic() const { return m_widgetMusic; }
+
     // Setters
     void setGestureEnabled(bool enabled);
     void setCurrentMediaUrl(const QString &url);
     void setCurrentYoutubeUrl(const QString &url);
+    void setWidgetClock(bool enabled);
+    void setWidgetWeather(bool enabled);
+    void setWidgetQuotes(bool enabled);
+    void setWidgetMusic(bool enabled);
 
 signals:
     void configChanged();
     void gestureEnabledChanged();
     void currentMediaUrlChanged();
     void currentYoutubeUrlChanged();
+    void widgetClockChanged();
+    void widgetWeatherChanged();
+    void widgetQuotesChanged();
+    void widgetMusicChanged();
     void loadingProgress(int percentage, const QString &message);
 
 private:
@@ -134,4 +154,10 @@ private:
     // Background Music
     QString m_glassModeBackgroundMusic;
     QVariantMap m_autoModeBackgroundMusic;
+
+    // Custom Mode Widget Settings (defaults: clock and weather only)
+    bool m_widgetClock{true};
+    bool m_widgetWeather{true};
+    bool m_widgetQuotes{false};
+    bool m_widgetMusic{false};
 };
