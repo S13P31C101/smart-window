@@ -1,29 +1,25 @@
 package com.lumiscape.smartwindow.media.service;
 
-import com.lumiscape.smartwindow.device.domain.Device;
-import com.lumiscape.smartwindow.device.repository.DeviceRepository;
-import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.S3Service;
+import com.lumiscape.smartwindow.fcm.service.FcmNotificationService;
+import com.lumiscape.smartwindow.global.util.FileNameUtils;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.dto.*;
+import com.lumiscape.smartwindow.media.event.MediaDeletedEvent;
+import com.lumiscape.smartwindow.media.event.MediaUploadEvent;
 import com.lumiscape.smartwindow.media.repository.MediaRepository;
 import com.lumiscape.smartwindow.user.domain.entity.User;
-import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 
+import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,11 +32,12 @@ import java.util.stream.Collectors;
 public class MediaService {
 
     private final MediaRepository mediaRepository;
-    private final DeviceRepository deviceRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final S3Service s3Service;
-    private final @Lazy DeviceService deviceService;
-    private final RestTemplate restTemplate;
+    private final FcmNotificationService fcmNotificationService;
+    private final AIService aiService;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.ai.secret}")
     private String aiCallbackSecret;
@@ -57,30 +54,28 @@ public class MediaService {
     }
 
     public MediaUploadResponse getUploadUrl(Long userId, MediaUploadRequest request) {
-        userId = 1L;
         String s3ObjectKey = createS3ObjectKey(request.fileName());
         String uploadUrl = s3Service.generatePresignedUrlForUpload(s3ObjectKey);
 
         return new MediaUploadResponse(s3ObjectKey, uploadUrl);
     }
 
-    public MediaUploadResponse getAIUploadUrl(String token, AIUploadUrlRequest request) {
-        verifyAIToken(token);
+    public MediaUploadResponse getAIUploadUrl(AIUploadUrlRequest request) {
         String s3ObjectKey = request.s3ObjectKey();
         String uploadUrl = s3Service.generatePresignedUrlForUpload(s3ObjectKey);
+
         return new MediaUploadResponse(s3ObjectKey, uploadUrl);
     }
 
     @Transactional
     public MediaResponse registerMedia(Long userId, MediaRegisterRequest request) {
-        userId = 1L;
         if (mediaRepository.existsByFileUrl(request.s3ObjectKey())) {
             log.warn("이미 존재하는 파일입니다..{}", request.s3ObjectKey());
 
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
 
-        User userReference = userRepository.getReferenceById(userId);
+        User userReference = userService.getUserReference(userId);
 
         Media media = Media.builder()
                 .user(userReference)
@@ -94,7 +89,14 @@ public class MediaService {
 
         Media savedMedia = mediaRepository.save(media);
 
-        requestAIGeneration(savedMedia);
+        // TODO remove deviceId
+        aiService.requestAIGeneration(savedMedia, request.deviceId());
+
+        eventPublisher.publishEvent(new MediaUploadEvent(
+                userId,
+                request.deviceId(),
+                savedMedia.getId()
+        ));
 
         return mapToMediaResponse(savedMedia);
     }
@@ -118,16 +120,7 @@ public class MediaService {
     public void deleteMedia(Long userId, Long mediaId) {
         Media mediaToDelete = findMediaByUser(mediaId, userId);
 
-        List<Device> affectedDevices = deviceRepository.findAllByMedia(mediaToDelete);
-
-        Media replacementMedia = (mediaToDelete.getOriginType() == MediaOrigin.AI_GENERATED && mediaToDelete.getParentMedia() != null)
-                ? mediaToDelete.getParentMedia() : null;
-
-        for (Device device : affectedDevices) {
-            device.updateMedia(replacementMedia);
-
-            deviceService.publishMediaUpdateToDevice(device);
-        }
+        eventPublisher.publishEvent(new MediaDeletedEvent(userId, mediaId));
 
         if (mediaToDelete.getOriginType() == MediaOrigin.ORIGINAL) {
             List<Media> childrenMedia = mediaRepository.findAllByParentMediaId(mediaId);
@@ -143,13 +136,25 @@ public class MediaService {
     }
 
     @Transactional
-    public void handleAICallback(String token, AICallbackRequest request) {
-        verifyAIToken(token);
-
+    public void handleAICallback(AICallbackRequest request) {
         Media parentMedia = mediaRepository.findById(request.parentMediaId())
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
 
-        String aiFileName = addSuffixBeforeExtension(parentMedia.getFileName(), "(AI)");
+        String type = FileNameUtils.extractAITypeFromKey(request.s3ObjectKey());
+        if (type == null || type.isEmpty()) {
+            log.error("[ AI ] 지원하지 않는 AI 생성 타입입니다. Type: {}", request.s3ObjectKey());
+            return;
+        }
+
+        MediaOrigin originType;
+        try {
+            originType = MediaOrigin.valueOf("AI_" + type);
+        } catch (IllegalArgumentException e) {
+            log.error("[ AI ] 지원하지 않는 AI 생성 타입입니다. Type: {}", type);
+            return;
+        }
+
+        String aiFileName = FileNameUtils.addSuffixBeforeExtension(parentMedia.getFileName(), "(" + type + ")");
 
         Media aiMedia = Media.builder()
                 .user(parentMedia.getUser())
@@ -158,7 +163,7 @@ public class MediaService {
                 .fileType(request.fileType())
                 .fileSize(request.fileSize())
                 .resolution(request.resolution())
-                .originType(MediaOrigin.AI_GENERATED)
+                .originType(originType)
                 .parentMedia(parentMedia)
                 .build();
 
@@ -167,48 +172,7 @@ public class MediaService {
         // TODO FCM Push
     }
 
-    @Async("taskExecutor")
-    public void requestAIGeneration(Media originMedia) {
-        String presignedDownloadUrl = s3Service.generatePresignedUrlForDownload(originMedia.getFileUrl());
-        String targetAiS3Key = addSuffixBeforeExtension(originMedia.getFileUrl(), "_AI");
-
-        AIRequest aiRequest = new AIRequest(originMedia.getId(), presignedDownloadUrl, targetAiS3Key);
-
-        log.info("mediaId : {}, \ndownloadUrl : {},\ntargetAIS3Key : {}", originMedia.getId(), presignedDownloadUrl, targetAiS3Key);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<AIRequest> requestEntity = new HttpEntity<>(aiRequest, headers);
-
-        try {
-            log.info("AI 서버에 이미지 생성을 요청합니다. Media ID: {}", originMedia.getId());
-            restTemplate.postForEntity(aiServerUrl + "/api/ai/images", requestEntity, String.class);
-            log.info("AI 서버에 성공적으로 요청했습니다. Media ID: {}", originMedia.getId());
-        } catch (Exception e) {
-            log.error("AI 서버 요청 실패. Media ID: {}", originMedia.getId(), e);
-        }
-    }
-
-    private void verifyAIToken(String token) {
-        if (aiCallbackSecret == null || aiCallbackSecret.isBlank() || !aiCallbackSecret.equals(token)) {
-            log.warn("AI TOKEN 불일치 : {}", token);
-            throw new CustomException(ErrorCode.ACCESS_DENIED);
-        }
-    }
-
-    private String addSuffixBeforeExtension(String fileName, String suffix) {
-        int dotIndex = fileName.lastIndexOf('.');
-        if (dotIndex == -1) {
-            return fileName + suffix;
-        } else {
-            String name = fileName.substring(0, dotIndex);
-            String extension = fileName.substring(dotIndex);
-            return name + suffix + extension;
-        }
-    }
-
-    private Media findMediaByUser(Long mediaId, Long userId) {
+    public Media findMediaByUser(Long mediaId, Long userId) {
         return mediaRepository.findByIdAndUserId(mediaId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
     }

@@ -1,5 +1,6 @@
 package com.lumiscape.smartwindow.media.dto;
 
+import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.domain.MediaType;
 
 public record AICallbackRequest(

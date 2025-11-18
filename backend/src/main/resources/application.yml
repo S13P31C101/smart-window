@@ -20,6 +20,7 @@ spring:
 
 server:
   port: 8080 # 우리 서버가 실행될 포트
+  forward-headers-strategy: framework
 
 # App-specific properties
 app:
@@ -41,7 +42,7 @@ cloud:
 # MQTT 설정
 mqtt:
   server:
-    uri: tcp://${MQTT_HOST}:${MQTT_PORT}
+    uri: ${MQTT_PROTOCOL}://${MQTT_HOST}:${MQTT_PORT}
   client:
     id: ${MQTT_CLIENT_ID}
   username: ${MQTT_USER}
@@ -108,3 +109,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect # DB 종류를 명시
+
+# CORS 설정
+cors:
+  allowed-origins: http://localhost:*,http://127.0.0.1:*,http://192.168.100.146:*,http://10.0.2.2:*,https://k13c101.p.ssafy.io
+
+# Firebase Cloud Messaging 설정
+fcm:
+  service-account-key-path: serviceAccountKey.json

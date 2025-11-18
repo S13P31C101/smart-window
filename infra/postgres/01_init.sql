@@ -13,10 +13,11 @@ CREATE TYPE social_provider_enum AS ENUM (
 );
 
 CREATE TYPE device_mode_enum AS ENUM (
-    'AUTO_MODE', 
-    'DARK_MODE', 
-    'SLEEP_MODE',
-    'CUSTOM_MODE'
+    'MENU_MODE',
+    'CUSTOM_MODE',
+    'AUTO_MODE',
+    'PRIVACY_MODE', 
+    'GLASS_MODE'
 );
 
 CREATE TYPE media_type_enum AS ENUM (
@@ -26,7 +27,21 @@ CREATE TYPE media_type_enum AS ENUM (
 
 CREATE TYPE media_origin_enum AS ENUM (
     'ORIGINAL', 
-    'AI_GENERATED'
+    'AI_RP',
+    'AI_SUNSET',
+    'AI_DAWN',
+    'AI_AFTERNOON',
+    'AI_NIGHT',
+    'AI_RP_SUNSET',
+    'AI_RP_DAWN',
+    'AI_RP_AFTERNOON',
+    'AI_RP_NIGHT'
+);
+
+CREATE TYPE registrant_source AS ENUM (
+    'SYSTEM',
+    'USER',
+    'AI'
 );
 
 CREATE TYPE permission_level_enum AS ENUM (
@@ -66,10 +81,20 @@ CREATE TABLE media (
     file_url VARCHAR(500) NOT NULL,
     file_type media_type_enum NOT NULL,
     file_size BIGINT NULL,
+    music_id BIGINT NULL REFERENCES musics(id) ON DELETE CASCADE,
     resolution VARCHAR(50) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     parent_media_id BIGINT NULL REFERENCES media(id) ON DELETE CASCADE,
     origin_type media_origin_enum NOT NULL
+);
+
+CREATE TABLE musics (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
+    music_name VARCHAR(255) NOT NULL,
+    music_url VARCHAR(500) NOT NULL,
+    registrant_type registrant_source NOT NULL DEFAULT 'USER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE devices (
@@ -79,9 +104,11 @@ CREATE TABLE devices (
     device_name VARCHAR(100) NOT NULL,
     power_status BOOLEAN DEFAULT FALSE NOT NULL,
     open_status BOOLEAN DEFAULT FALSE NOT NULL,
-    mode_status device_mode_enum DEFAULT 'AUTO_MODE' NOT NULL,
+    opacity_status BOOLEAN DEFAULT FALSE NOT NULL,
+    mode_status device_mode_enum DEFAULT 'MENU_MODE' NOT NULL,
     mode_settings JSONB NULL,
     media_id BIGINT NULL REFERENCES media(id) ON DELETE SET NULL,
+    music_id BIGINT NULL REFERENCES musics(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -93,6 +120,11 @@ CREATE TABLE alarms (
     repeat_days VARCHAR(100) NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE refresh_tokens (
+    user_id BIGINT NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(1024) NOT NULL UNIQUE
 );
 
 --
@@ -120,8 +152,13 @@ CREATE TABLE user_device_permissions (
 -- 3. 인덱스
 
 CREATE INDEX idx_devices_user_id ON devices (user_id);
+CREATE INDEX idx_devices_media_id ON devices (media_id);
+CREATE INDEX idx_devices_music_id ON devices (music_id);
 CREATE INDEX idx_media_user_id ON media (user_id);
 CREATE INDEX idx_media_parent_media_id ON media (parent_media_id);
+CREATE INDEX idx_media_music_id ON media (music_id);
+CREATE INDEX idx_musics_user_id ON musics (user_id);
 CREATE INDEX idx_alarms_device_id ON alarms (device_id);
 CREATE INDEX idx_user_social_accounts_user_id ON user_social_accounts (user_id);
 CREATE INDEX idx_mobiles_user_id ON mobiles (user_id);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);

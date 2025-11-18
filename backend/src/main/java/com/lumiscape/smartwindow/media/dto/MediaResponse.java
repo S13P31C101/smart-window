@@ -14,6 +14,7 @@ public record MediaResponse(
         MediaOrigin originType,
         Long parentMediaId,
         Long fileSize,
+        Long musicId,
         String resolution,
         OffsetDateTime createdAt
 ) {
@@ -26,6 +27,7 @@ public record MediaResponse(
                 media.getOriginType(),
                 (media.getParentMedia() != null) ? media.getParentMedia().getId() : null,
                 media.getFileSize(),
+                (media.getMusic() != null) ? media.getMusic().getId() : null,
                 media.getResolution(),
                 media.getCreatedAt()
         );

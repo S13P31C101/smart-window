@@ -1,5 +1,6 @@
 package com.lumiscape.smartwindow.media.domain;
 
+import com.lumiscape.smartwindow.music.domain.Music;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -41,6 +42,10 @@ public class Media {
 
     @Column(name = "file_size")
     private Long fileSize;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "music_id")
+    private Music music;
 
     @Column(length = 50)
     private String resolution;

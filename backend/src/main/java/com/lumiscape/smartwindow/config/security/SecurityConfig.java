@@ -1,12 +1,18 @@
 package com.lumiscape.smartwindow.config.security;
 
+import com.lumiscape.smartwindow.config.ai.AITokenAuthFilter;
+import com.lumiscape.smartwindow.config.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -19,52 +25,61 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final OAuth2SuccessHandler oAuth2SuccessHandler; // 1. 이 필드를 다시 추가
-    
-    // TODO: 앞으로 만들 OAuth2 관련 서비스들을 주입받을 예정입니다.
-    // private final CustomOAuth2UserService customOAuth2UserService;
-    // private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter; // 1. 주입 받기
+    private final AITokenAuthFilter aiTokenAuthFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. 기본 인증 방식 비활성화
-                .csrf(csrf -> csrf.disable()) // CSRF 보호 비활성화
-                .httpBasic(basic -> basic.disable()) // HTTP Basic 인증 비활성화
-                .formLogin(form -> form.disable()) // 폼 로그인 비활성화
+                .csrf(csrf -> csrf.disable())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
 
-                // 2. 세션 관리 방식을 STATELESS(세션 사용 안함)으로 설정 -> JWT 인증을 위함
                 .sessionManagement(configurer -> configurer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                
-                // 3. CORS 설정 추가
+
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 4. 요청 경로별 접근 권한 설정
                 .authorizeHttpRequests(authorize -> authorize
-                        // 2. "/auth/success" 경로를 permitAll에 추가
-                        .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**", "/auth/success").permitAll() 
+                        .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**", "/auth/success", "/tokens/reissue").permitAll()
+                        .requestMatchers("/api/v1/media/ai-upload-url", "/api/v1/media/ai-callback", "/api/v1/musics/ai-callback").hasRole("AI_SERVER")
                         .anyRequest().authenticated()
                 )
 
-                // 5. OAuth2 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
-                        .successHandler(oAuth2SuccessHandler) // 3. successHandler를 등록
+                        .authorizationEndpoint(endpoint -> endpoint
+                                .baseUri("/oauth2/authorization") // 👈 1. 인증 요청 URI 기본값 명시
+                                .authorizationRequestRepository(authorizationRequestRepository()) // 👈 2. 인증 요청 정보를 쿠키에 저장하도록 설정
+                        )
+                        .successHandler(oAuth2SuccessHandler)
                 )
-                
-                // 6. JWT 필터 추가
-                // TODO: 우리가 만든 JWT 필터를 Spring Security 필터 체인에 추가
-                // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        ; // <-- 여기에 http 설정 체인을 마무리하는 세미콜론 추가
+
+                .addFilterBefore(aiTokenAuthFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // 2. JWT 필터 추가
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // 👇 3. AuthorizationRequestRepository 빈 추가
+    @Bean
+    public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository() {
+        return new HttpSessionOAuth2AuthorizationRequestRepository();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // TODO: 프론트엔드 개발 서버 주소 추가 필요
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",      // PC 웹 브라우저 및 시뮬레이터
+                "http://127.0.0.1:*",      // localhost IP 주소 직접 접근
+                "http://192.168.100.146:*", // 모바일 기기 테스트용 내부 IP
+                // Android Emulator
+                "http://10.0.2.2:*",
+                "https://k13c101.p.ssafy.io"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setExposedHeaders(Arrays.asList("*"));

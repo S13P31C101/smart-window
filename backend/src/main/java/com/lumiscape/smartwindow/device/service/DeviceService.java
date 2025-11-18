@@ -1,7 +1,5 @@
 package com.lumiscape.smartwindow.device.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
@@ -11,15 +9,21 @@ import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
-import com.lumiscape.smartwindow.media.repository.MediaRepository;
+import com.lumiscape.smartwindow.media.domain.MediaOrigin;
+import com.lumiscape.smartwindow.media.service.MediaService;
+import com.lumiscape.smartwindow.music.domain.Music;
+import com.lumiscape.smartwindow.music.service.MusicService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
-import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 
+import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,11 +35,22 @@ import java.util.stream.Collectors;
 public class DeviceService {
 
     private final DeviceRepository deviceRepository;
-    private final UserRepository userRepository;
-    private final MediaRepository mediaRepository;
+    private final UserService userService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
-    private final ObjectMapper objectMapper;
+
+    private MediaService mediaService;
+    private MusicService musicService;
+
+    @Autowired
+    public void setMediaService(@Lazy MediaService mediaService) {
+        this.mediaService = mediaService;
+    }
+
+    @Autowired
+    public void setMusicService(@Lazy MusicService musicService) {
+        this.musicService = musicService;
+    }
 
     public List<DeviceDetailResponse> getMyDevice(Long userId) {
 
@@ -50,7 +65,7 @@ public class DeviceService {
             throw new CustomException(ErrorCode.DEVICE_ALREADY_EXISTS);
         }
 
-        User userReference = userRepository.getReferenceById(userId);
+        User userReference = userService.getUserReference(userId);
 
         Device newDevice = Device.builder()
                 .user(userReference)
@@ -95,7 +110,7 @@ public class DeviceService {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "power", Map.of("status", newStatus));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "power", Map.of("status", newStatus));
 
         device.updatePower(newStatus);
 
@@ -113,11 +128,23 @@ public class DeviceService {
         Device device = findDeviceByUser(deviceId, userId);
         boolean newStatus = request.status();
 
-        publishMqttCommand(device.getDeviceUniqueId(), "open", Map.of("status", newStatus));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "open", Map.of("status", newStatus));
 
         device.updateOpen(newStatus);
 
         return DeviceStatusResponse.ofOpen(device);
+    }
+
+    @Transactional
+    public DeviceStatusResponse controlOpacity(Long userId, Long deviceId, DeviceStatusRequest request) {
+        Device device = findDeviceByUser(deviceId, userId);
+        boolean newStatus = request.status();
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "opacity", Map.of("status", newStatus));
+
+        device.updateOpacity(newStatus);
+
+        return DeviceStatusResponse.ofOpacity(device);
     }
 
     @Transactional
@@ -126,7 +153,7 @@ public class DeviceService {
 
         DeviceMode newMode = DeviceMode.valueOf(request.mode().toUpperCase());
 
-        publishMqttCommand(device.getDeviceUniqueId(), "mode", Map.of("mode", newMode.name()));
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", Map.of("status", newMode.name()));
 
         device.updateMode(newMode);
 
@@ -136,9 +163,15 @@ public class DeviceService {
     @Transactional
     public DeviceModeSettingsResponse controlModeSettings(Long userId, Long deviceId, DeviceModeSettingsRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
-        Map<String, Object> newSettings = request.settings();
+        Map<String, Object> newSettings = Map.of("widgetClock", request.widgetClock(),
+                "widgetWeather", request.widgetWeather(),
+                "widgetQuotes", request.widgetQuotes(),
+                "widgetMusic", request.widgetMusic());
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "widgets", newSettings);
 
         device.updateModeSettings(newSettings);
+        log.info(newSettings.toString());
 
         return DeviceModeSettingsResponse.from(device);
     }
@@ -149,8 +182,7 @@ public class DeviceService {
 
         Media media = null;
         if (mediaId != null) {
-            media = mediaRepository.findByIdAndUserId(mediaId, userId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
+            media = mediaService.findMediaByUser(mediaId, userId);
         }
 
         device.updateMedia(media);
@@ -161,38 +193,80 @@ public class DeviceService {
     }
 
     @Transactional
+    public void deleteDevicesMedia(Long userId, Long mediaId) {
+        Media media = mediaService.findMediaByUser(mediaId, userId);
+
+        List<Device> affectedDevices = findByAllMedia(media);
+
+        Media replacementMedia = (media.getOriginType() != MediaOrigin.ORIGINAL && media.getParentMedia() != null)
+                ? media.getParentMedia() : null;
+
+        for (Device device : affectedDevices) {
+            device.updateMedia(replacementMedia);
+            publishMediaUpdateToDevice(device);
+        }
+    }
+
+    @Transactional
+    public DeviceDetailResponse updateDeviceMusic(Long userId, Long deviceId, Long musicId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        Music music = null;
+        if (musicId != null) {
+            music = musicService.findMusicByUser(musicId, userId);
+        }
+
+        device.updateMusic(music);
+
+        publishMusicUpdateToDevice(device);
+
+        return DeviceDetailResponse.from(device);
+    }
+
+    @Transactional
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
-        Device device = deviceRepository.findByDeviceUniqueId(deviceUniqueId)
-                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
-        // TODO
+        Device device = findByDeviceUniqueId(deviceUniqueId);
+
         switch (statusType) {
             case "power":
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
+                // TODO FCM
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
                 device.updateOpen(open);
+                // TODO FCM
+                break;
+            case "sensor":
+                // TODO FCM
                 break;
         }
     }
 
-    private Device findDeviceByUser(Long deviceId, Long userId) {
+    @Transactional(readOnly = true)
+    public Device findDeviceByUser(Long deviceId, Long userId) {
         return deviceRepository.findByIdAndUserId(deviceId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FORBIDDEN_DEVICE_ACCESS));
     }
 
-    private void publishMqttCommand(String deviceUniqueId, String command, Object payload) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-            mqttPublishService.publishCommand(deviceUniqueId, command, jsonPayload);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize MQTT payload", e);
+    public List<Device> findByAllMedia(Media media) {
+        return deviceRepository.findAllByMedia(media);
+    }
 
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
+    public Device findByDeviceUniqueId(String deviceUniqueId) {
+        return deviceRepository.findByDeviceUniqueId(deviceUniqueId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+    }
+
+    // TODO improve music part
+    public String findById(Long deviceId) {
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+
+        return device.getDeviceUniqueId();
     }
 
     public void publishMediaUpdateToDevice(Device device) {
@@ -205,10 +279,28 @@ public class DeviceService {
             mediaId = media.getId();
 
             mediaUrl = s3Service.generatePresignedUrlForDownload(media.getFileUrl());
-
-            Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
-
-            publishMqttCommand(device.getDeviceUniqueId(), "media", payload);
         }
+
+        Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
+    }
+
+    public void publishMusicUpdateToDevice(Device device) {
+        Music music = device.getMusic();
+
+        Long musicId = null;
+        String musicUrl = null;
+
+        if (music != null) {
+            musicId = music.getId();
+            musicUrl = music.getMusicUrl();
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("musicId", musicId);
+        payload.put("musicUrl", musicUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
 }

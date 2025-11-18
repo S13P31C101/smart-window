@@ -31,7 +31,7 @@ pipeline {
             steps {
                 dir('infra') {
                     sh 'docker compose down'
-                    
+
                     sh 'cp /.env .env'
                     
                     sh 'docker compose up -d --build'

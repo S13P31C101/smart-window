@@ -2,6 +2,7 @@ package com.lumiscape.smartwindow.device.domain;
 
 import com.lumiscape.smartwindow.alarm.domain.Alarm;
 import com.lumiscape.smartwindow.media.domain.Media;
+import com.lumiscape.smartwindow.music.domain.Music;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 
 import jakarta.persistence.*;
@@ -44,6 +45,9 @@ public class Device {
     @Column(name = "open_status", nullable = false)
     private boolean openStatus = false;
 
+    @Column(name = "opacity_status", nullable = false)
+    private boolean opacityStatus = false;
+
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "mode_status", nullable = false, columnDefinition = "device_mode_enum")
     private DeviceMode modeStatus = DeviceMode.AUTO_MODE;
@@ -55,6 +59,10 @@ public class Device {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "media_id")
     private Media media;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "music_id")
+    private Music music;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -80,6 +88,9 @@ public class Device {
     public void updateOpen(boolean openStatus) {
         this.openStatus = openStatus;
     }
+    public void updateOpacity(boolean opacityStatus) {
+        this.opacityStatus = opacityStatus;
+    }
     public void updateMode(DeviceMode modeStatus) {
         this.modeStatus = modeStatus;
     }
@@ -88,6 +99,9 @@ public class Device {
     }
     public void updateMedia(Media media) {
         this.media = media;
+    }
+    public void updateMusic(Music music) {
+        this.music = music;
     }
 
 }

@@ -37,6 +37,7 @@ public class MqttSubscribeService {
 
             deviceService.updateDeviceStatusFromMqtt(deviceUniqueId, statusType, payload);
 
+            // TODO FCM
 //            fcmService.notifyDeviceStatusChange(deviceUniqueId, statusType, payload);
         } catch (Exception e) {
             log.error("MQTT STATUS receive FAILED : {}", topic, e);
