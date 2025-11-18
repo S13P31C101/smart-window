@@ -266,9 +266,9 @@ Item {
         }
     }
 
-    // ========== 하단 YouTube Background Music ==========
-    YouTubePlayer {
-        id: youtubePlayer
+    // ========== 하단 YouTube Audio Player - yt-dlp based ==========
+    YouTubeAudioWidget {
+        id: youtubeAudioWidget
         youtubeUrl: root.currentBackgroundMusicUrl
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -276,11 +276,11 @@ Item {
         anchors.bottomMargin: parent.height * 0.03
         visible: root.currentBackgroundMusicUrl !== ""
 
-        width: Math.min(parent.width * 0.45, 500)  // Compact size
-        height: 160
+        width: Math.min(parent.width * 0.55, 700)
+        height: 200
 
         onPlayerReady: {
-            console.log("Background music player ready in Auto Mode")
+            console.log("YouTube audio player ready in Auto Mode")
         }
     }
 
