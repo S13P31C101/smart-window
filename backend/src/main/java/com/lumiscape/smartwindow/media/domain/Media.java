@@ -42,6 +42,9 @@ public class Media {
     @Column(name = "file_size")
     private Long fileSize;
 
+    @Column(name = "bgm_url")
+    private String bgmUrl;
+
     @Column(length = 50)
     private String resolution;
 

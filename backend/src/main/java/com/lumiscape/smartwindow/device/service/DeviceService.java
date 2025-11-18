@@ -135,6 +135,18 @@ public class DeviceService {
     }
 
     @Transactional
+    public DeviceStatusResponse controlOpacity(Long userId, Long deviceId, DeviceStatusRequest request) {
+        Device device = findDeviceByUser(deviceId, userId);
+        boolean newStatus = request.status();
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "opacity", Map.of("status", newStatus));
+
+        device.updateOpacity(newStatus);
+
+        return DeviceStatusResponse.ofOpacity(device);
+    }
+
+    @Transactional
     public DeviceModeStatusResponse controlModeStatus(Long userId, Long deviceId, DeviceModeStatusRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
 

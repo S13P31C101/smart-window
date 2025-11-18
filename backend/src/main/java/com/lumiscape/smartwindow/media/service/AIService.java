@@ -33,9 +33,9 @@ public class AIService {
 
         List<MediaOrigin> aiTypesToGenerate = List.of(
                 MediaOrigin.AI_RP,
-                // MediaOrigin.AI_SUNSET,
+                MediaOrigin.AI_SUNSET,
                 MediaOrigin.AI_DAWN,
-                // MediaOrigin.AI_AFTERNOON,
+                MediaOrigin.AI_AFTERNOON,
                 MediaOrigin.AI_NIGHT
         );
 

@@ -14,6 +14,7 @@ public record MediaResponse(
         MediaOrigin originType,
         Long parentMediaId,
         Long fileSize,
+        String bgmUrl,
         String resolution,
         OffsetDateTime createdAt
 ) {
@@ -26,6 +27,7 @@ public record MediaResponse(
                 media.getOriginType(),
                 (media.getParentMedia() != null) ? media.getParentMedia().getId() : null,
                 media.getFileSize(),
+                media.getBgmUrl(),
                 media.getResolution(),
                 media.getCreatedAt()
         );
