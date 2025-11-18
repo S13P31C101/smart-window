@@ -45,6 +45,9 @@ public class Device {
     @Column(name = "open_status", nullable = false)
     private boolean openStatus = false;
 
+    @Column(name = "opacity_status", nullable = false)
+    private boolean opacityStatus = false;
+
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "mode_status", nullable = false, columnDefinition = "device_mode_enum")
     private DeviceMode modeStatus = DeviceMode.AUTO_MODE;
@@ -84,6 +87,9 @@ public class Device {
     }
     public void updateOpen(boolean openStatus) {
         this.openStatus = openStatus;
+    }
+    public void updateOpacity(boolean opacityStatus) {
+        this.opacityStatus = opacityStatus;
     }
     public void updateMode(DeviceMode modeStatus) {
         this.modeStatus = modeStatus;

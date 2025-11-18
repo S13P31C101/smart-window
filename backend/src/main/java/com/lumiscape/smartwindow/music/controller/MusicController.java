@@ -1,6 +1,7 @@
 package com.lumiscape.smartwindow.music.controller;
 
 import com.lumiscape.smartwindow.global.common.ApiResponse;
+import com.lumiscape.smartwindow.music.dto.AIMusicCallbackRequest;
 import com.lumiscape.smartwindow.music.dto.MusicRegisterRequest;
 import com.lumiscape.smartwindow.music.dto.MusicResponse;
 import com.lumiscape.smartwindow.music.dto.MusicUpdateRequest;
@@ -50,5 +51,12 @@ public class MusicController {
         musicService.deleteMusic(userId, musicId);
 
         return ApiResponse.onSuccess();
+    }
+
+    @PostMapping("/ai-callback")
+    public ApiResponse<?> handleCallback(@RequestBody AIMusicCallbackRequest request) {
+        musicService.handleAICallback(request);
+
+        return ApiResponse.onSuccess(HttpStatus.CREATED, null);
     }
 }

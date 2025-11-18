@@ -42,7 +42,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**", "/auth/success", "/tokens/reissue").permitAll()
-                        .requestMatchers("/api/v1/media/ai-upload-url", "/api/v1/media/ai-callback").hasRole("AI_SERVER")
+                        .requestMatchers("/api/v1/media/ai-upload-url", "/api/v1/media/ai-callback", "/api/v1/musics/ai-callback").hasRole("AI_SERVER")
                         .anyRequest().authenticated()
                 )
 

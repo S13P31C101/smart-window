@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -132,6 +133,18 @@ public class DeviceService {
         device.updateOpen(newStatus);
 
         return DeviceStatusResponse.ofOpen(device);
+    }
+
+    @Transactional
+    public DeviceStatusResponse controlOpacity(Long userId, Long deviceId, DeviceStatusRequest request) {
+        Device device = findDeviceByUser(deviceId, userId);
+        boolean newStatus = request.status();
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "opacity", Map.of("status", newStatus));
+
+        device.updateOpacity(newStatus);
+
+        return DeviceStatusResponse.ofOpacity(device);
     }
 
     @Transactional
@@ -248,6 +261,14 @@ public class DeviceService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
     }
 
+    // TODO improve music part
+    public String findById(Long deviceId) {
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+
+        return device.getDeviceUniqueId();
+    }
+
     public void publishMediaUpdateToDevice(Device device) {
         Media media = device.getMedia();
 
@@ -276,7 +297,9 @@ public class DeviceService {
             musicUrl = music.getMusicUrl();
         }
 
-        Map<String, Object> payload = Map.of("musicId", musicId, "musicUrl", musicUrl);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("musicId", musicId);
+        payload.put("musicUrl", musicUrl);
 
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
