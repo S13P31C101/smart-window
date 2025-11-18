@@ -1,21 +1,20 @@
 import os
-import io
 import uuid
 import asyncio
+import json
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 import utils
-import json
 
 load_dotenv()
-app = FastAPI()
-
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 task_queue = asyncio.Queue()
 task_results = {}
+
+app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
@@ -63,8 +62,7 @@ async def download_image_bytes(download_url):
 
 @app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
-    print("[QUEUE INPUT] remove-person request =")
-    print(json.dumps(request, indent=2))
+    print("[QUEUE INPUT] remove-person request =", json.dumps(request, indent=2))
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
@@ -74,10 +72,10 @@ async def remove_person_and_upload(request: dict = Body(...)):
     await task_queue.put((task_id, "remove-person", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
+
 @app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict = Body(...)):
-    print("[QUEUE INPUT] recommend-music request =")
-    print(json.dumps(request, indent=2))
+    print("[QUEUE INPUT] recommend-music request =", json.dumps(request, indent=2))
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
@@ -87,10 +85,10 @@ async def recommend_music(request: dict = Body(...)):
     await task_queue.put((task_id, "recommend-music", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
+
 @app.post("/api/v1/ai/scene-blend")
 async def scene_blend(request: dict = Body(...)):
-    print("[QUEUE INPUT] scene-blend request =")
-    print(json.dumps(request, indent=2))
+    print("[QUEUE INPUT] scene-blend request =", json.dumps(request, indent=2))
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
@@ -102,8 +100,7 @@ async def scene_blend(request: dict = Body(...)):
 
 @app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
-    print("[QUEUE INPUT] generate-dalle-image request =")
-    print(json.dumps(request, indent=2))
+    print("[QUEUE INPUT] generate-dalle-image request =", json.dumps(request, indent=2))
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "generate-dalle-image", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
