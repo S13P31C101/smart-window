@@ -1,184 +1,196 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException,Body,BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
-import io
-import utils  # 위의 utils.py에 모든 부속 함수 포함되어 있다고 가정
-import httpx
 import os
+import uuid
+import asyncio
+import json
+import time
+from fastapi import FastAPI, Body
+from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
-from PIL import Image
-from huggingface_hub import login
+import utils
 
 load_dotenv()
-app = FastAPI()
-#login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
-
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-@app.post("/api/v1/ai/remove-person")
-async def remove_person_and_upload(request: dict = Body(...), background_tasks: BackgroundTasks = None):
-    media_id = request.get("mediaId")
+music_queue = asyncio.Queue()
+main_queue = asyncio.Queue()
+task_results = {}
+
+# 음악 실행 중 여부 flag
+music_in_progress = False
+
+app = FastAPI()
+
+async def download_image_bytes(download_url):
+    print(f"[DOWNLOAD] >> download_image_bytes called ({download_url})")
+    try:
+        print("[DOWNLOAD] >> Creating AsyncClient")
+        async with utils.httpx.AsyncClient(timeout=30.0) as client:
+            print("[DOWNLOAD] >> before GET call")
+            try:
+                resp = await client.get(download_url)
+                print(f"[DOWNLOAD] >> after GET call, status={resp.status_code}")
+            except Exception as e:
+                print(f"[DOWNLOAD][EXCEPTION] in GET call: {e}")
+                raise
+            if resp.status_code == 200:
+                print(f"[DOWNLOAD] >> Success. Bytes={len(resp.content)}")
+                return resp.content
+            else:
+                print(f"[DOWNLOAD][ERROR] Download fail ({resp.status_code}) url={download_url}")
+                return None
+    except Exception as e:
+        print(f"[DOWNLOAD][ERROR] Exception (outer): {e}")
+        return None
+    finally:
+        print("[DOWNLOAD] >> Download function finished (finally block)")
+
+# --- 중앙 스케줄러 ---
+async def scheduler_worker():
+    global music_in_progress
+    print("[SCHEDULER] >>> Worker started")
+    while True:
+        # 음악 큐/작업 진행 중이면 무조건 음악만!
+        if not music_queue.empty() or music_in_progress:
+            if not music_queue.empty() and not music_in_progress:
+                task_id, request = await music_queue.get()
+                print(f"[SCHEDULER] >>> Got MUSIC task {task_id} | Time={time.strftime('%X')}")
+                music_in_progress = True
+                try:
+                    result = await process_music_request(request)
+                    task_results[task_id] = result
+                except Exception as e:
+                    print(f"[SCHEDULER][ERROR] music: {e}")
+                    task_results[task_id] = {"success": False, "error": str(e)}
+                finally:
+                    music_queue.task_done()
+                    music_in_progress = False
+            else:
+                # music 처리 중 -> main 대기
+                await asyncio.sleep(0.05)
+        elif not main_queue.empty():
+            task_id, task_type, req = await main_queue.get()
+            print(f"[SCHEDULER] >>> Got MAIN task {task_id} ({task_type}) | Time={time.strftime('%X')}")
+            try:
+                result = await process_main_request(task_type, req)
+                task_results[task_id] = result
+            except Exception as e:
+                print(f"[SCHEDULER][ERROR] main: {e}")
+                task_results[task_id] = {"success": False, "error": str(e)}
+            finally:
+                main_queue.task_done()
+        else:
+            await asyncio.sleep(0.1)
+
+@app.on_event("startup")
+async def startup_event():
+    print("[SYSTEM] Scheduler with music-priority!")
+    asyncio.create_task(scheduler_worker())
+
+# --- 작업별 처리 함수 ---
+
+async def process_music_request(request):
     download_url = request.get("downloadUrl")
-    target_s3_key = request.get("targetAIS3Key")
-    if not media_id or not download_url or not target_s3_key:
-        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, and targetAIS3Key are required")
+    print(f"[PROCESS_MUSIC] Downloading image for music from: {download_url}")
+    image_bytes = await download_image_bytes(download_url)
+    if not image_bytes:
+        return {"success": False, "error": "Image download failed"}
+    request['image_bytes'] = image_bytes
 
-    # --- BackgroundJob 정의 (완전 동기 함수) ---
-    def background_job(media_id, download_url, target_s3_key):
-        try:
-            # 1. 원본 이미지 다운로드
-            image = utils.sync_download_image(download_url)  # sync 버전 필요
-            height, width = image.shape[:2]
-            mask = utils.np.zeros((height, width), utils.np.uint8)
-            # 2. YOLO로 사람 탐지 후 마스크 생성
-            results = utils.yolo_model.predict(image)
-            for r in results:
-                for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
-                    if int(cls) == 0:
-                        box_expanded = utils.expand_box(box, image.shape, scale=0.1)
-                        x1, y1, x2, y2 = map(int, box_expanded)
-                        mask[y1:y2, x1:x2] = 255
-            # 3. 인페인팅
-            inpainted_image = utils.sync_inpaint_image(image, mask)  # sync 버전 필요
-            buffer = io.BytesIO()
-            inpainted_image.save(buffer, format="PNG")
-            buffer.seek(0)
-            # 4. BE에 AI 업로드 URL 요청
-            ai_upload_data = utils.sync_request_ai_upload_url(target_s3_key)
-            if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-                raise Exception("S3 object key mismatch or missing in AI upload URL response")
-            file_url = ai_upload_data.get("fileUrl")
-            if not file_url:
-                raise Exception("fileUrl missing in AI upload URL response")
-            # 5. S3에 이미지 업로드
-            utils.sync_upload_to_s3(file_url, buffer)
-            # 6. AI 콜백 전송
-            utils.sync_notify_ai_callback(media_id, target_s3_key)
-            print(f"Background: {target_s3_key} 성공!")
-        except Exception as e:
-            print("BackgroundTask 실패:", e)
+    loop = asyncio.get_running_loop()
+    caption = await loop.run_in_executor(
+        None, utils.extract_mood_caption, image_bytes
+    )
+    print(f"[PROCESS_MUSIC] Caption: {caption}")
 
-    # 백그라운드 태스크로 실행
-    background_tasks.add_task(background_job, media_id, download_url, target_s3_key)
-    # 빠른 응답
-    return JSONResponse(content={"success": True, "message": "Person removal started. You will be notified when it is done."})
+    query = f"{caption} piano music"
+    result = await utils.search_youtube_music(query)
+    if result:
+        music_url = result["url"]
+        await utils.notify_music_callback(
+            request["mediaId"],
+            str(request.get("deviceId", request.get("targetAIS3Key"))),
+            music_url
+        )
+        return {"success": True, "message": f"Found song '{result['title']}'", "youtube_url": music_url, "mood_caption": caption}
+    else:
+        return {"success": False, "message": "No matching music found.", "mood_caption": caption}
+
+async def process_main_request(task_type, req):
+    loop = asyncio.get_running_loop()
+    if task_type == 'remove-person':
+        print(f"[PROCESS_MAIN] Start remove-person")
+        result = await loop.run_in_executor(None, utils.handle_remove_person, req)
+    elif task_type == 'scene-blend':
+        print(f"[PROCESS_MAIN] Start scene-blend")
+        result = await utils.handle_scene_blend(req)
+    elif task_type == 'generate-dalle-image':
+        print(f"[PROCESS_MAIN] Start generate-dalle-image")
+        result = await utils.handle_generate_dalle_image(req)
+    else:
+        print(f"[PROCESS_MAIN][ERROR] Unknown task type: {task_type}")
+        result = {"success": False, "error": "Unknown task type"}
+    return result
+
+# --- API ---
+
+@app.post("/api/v1/ai/remove-person")
+async def remove_person_and_upload(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] remove-person request: {json.dumps(request, indent=2)}")
+    await asyncio.sleep(1)
+    download_url = request.get("downloadUrl")
+    image_bytes = await download_image_bytes(download_url)
+    if not image_bytes:
+        print("[QUEUE INPUT][ERROR] Image download failed for remove-person")
+        return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
+    request['image_bytes'] = image_bytes
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to main_queue (remove-person) task_id={task_id}")
+    await main_queue.put((task_id, "remove-person", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.post("/api/v1/ai/scene-blend")
+async def scene_blend(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] scene-blend request: {json.dumps(request, indent=2)}")
+    await asyncio.sleep(1)
+    download_url = request.get("downloadUrl")
+    image_bytes = await download_image_bytes(download_url)
+    if not image_bytes:
+        print("[QUEUE INPUT][ERROR] Image download failed for scene-blend")
+        return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
+    request['image_bytes'] = image_bytes
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to main_queue (scene-blend) task_id={task_id}")
+    await main_queue.put((task_id, "scene-blend", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict = Body(...)):
-    download_url = request.get("downloadUrl")
-    if not download_url:
-        raise HTTPException(status_code=400, detail="downloadUrl is required")
-
-    # 1. 외부 이미지 다운로드
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(download_url)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to download image")
-        image_bytes = resp.content    # <-- 변경 포인트
-
-    # 2. 키워드 추출
-    caption = utils.extract_mood_caption(image_bytes)  # <-- 변경 포인트 (비동기 아님)
-    # 만약 extract_mood_caption이 동기라면 await 삭제
-
-    # 3. 음악 추천
-    result = await utils.search_youtube_music(caption + " piano music")
-    if result:
-        return {
-            "success": True,
-            "message": f"Found song '{result['title']}'",
-            "youtube_url": result["url"],
-            "mood_caption": caption
-        }
-    else:
-        return {
-            "success": False,
-            "message": "No matching music found.",
-            "mood_caption": caption
-        }
-
-
-
-
-@app.post("/api/v1/ai/scene-blend")
-async def removehuman_scene_and_upload(request: dict):
-    media_id = request.get("mediaId")
-    download_url = request.get("downloadUrl")
-    target_s3_key = request.get("targetAIS3Key")
-    scene_type = request.get("sceneType", "night").lower().strip()  # 기본값 night
-
-    if not media_id or not download_url or not target_s3_key or not scene_type:
-        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, sceneType, and targetAIS3Key are required")
-
-    try:
-        # 1. 원본 이미지 다운로드 (np.ndarray, BGR)
-        image = await utils.download_image(download_url)
-        height, width = image.shape[:2]
-
-        # 2. SegFormer로 하늘 마스크 추출 (scene-blend 재활용)
-        sky_mask = await utils.sky_mask_segformer(image)
-
-        # 3. sceneType별 프롬프트
-        prompt = utils.get_scene_prompt(scene_type)
-
-        # 4. inpaint(하늘 마스크에 프롬프트 적용, removehuman이지만 사실상 sky inpainting)
-        inpainted_image = utils.inpaint_image_with_prompt(image, sky_mask, prompt, mask_is_sky=True)
-
-        # 5. 결과 버퍼 준비
-        buffer = io.BytesIO()
-        inpainted_image.save(buffer, format="PNG")
-        buffer.seek(0)
-
-        # 6. S3 presigned 업로드 URL 요청
-        ai_upload_data = await utils.request_ai_upload_url(target_s3_key)
-        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-            raise HTTPException(status_code=500, detail="S3 object key mismatch or missing in AI upload URL response")
-        file_url = ai_upload_data.get("fileUrl")
-        if not file_url:
-            raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
-        # 7. S3에 업로드
-        await utils.upload_to_s3(file_url, buffer)
-
-        # 8. AI 콜백
-        await utils.notify_ai_callback(media_id, target_s3_key)
-
-        return JSONResponse(content={
-            "success": True,
-            "message": f"Sky region inpainted as {scene_type} and uploaded to S3.",
-            "result_s3_key": target_s3_key,
-            "result_s3_url": file_url
-        })
-    except HTTPException as he:
-        return JSONResponse(content={"success": False, "error": he.detail}, status_code=he.status_code)
-    except Exception as e:
-        tb = utils.traceback.format_exc()
-        print(tb)
-        return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
+    print(f"[QUEUE INPUT] recommend-music request: {json.dumps(request, indent=2)}")
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to music_queue (recommend-music) task_id={task_id}")
+    await music_queue.put((task_id, request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
-    prompt = request.get("prompt")
-    if not prompt or not isinstance(prompt, str):
-        raise HTTPException(status_code=400, detail="prompt is required as non-empty text.")
-    try:
-        img_url = await utils.gms_dalle_generate_image(prompt)
-        # -- 이미지 다운로드 (바이너리) --
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.get(img_url)
-            if resp.status_code != 200:
-                raise RuntimeError("이미지 다운로드 실패")
-            img_bytes = resp.content
-        # -- PNG/JPEG로 변환 및 스트림 반환 --
-        buf = io.BytesIO(img_bytes)
-        try:
-            # PIL로 열어서, 다시 PNG로 변환(혹시 원본이 JPEG일 경우)
-            img = Image.open(buf)
-            out_buf = io.BytesIO()
-            img.save(out_buf, format="PNG")
-            out_buf.seek(0)
-            return StreamingResponse(out_buf, media_type="image/png")
-        except Exception:
-            # 그냥 원본 바이너리 반환 (이미 PNG라면 그대로)
-            buf.seek(0)
-            return StreamingResponse(buf, media_type="image/png")
-    except Exception as e:
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+    print(f"[QUEUE INPUT] generate-dalle-image request: {json.dumps(request, indent=2)}")
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to main_queue (generate-dalle-image) task_id={task_id}")
+    await main_queue.put((task_id, "generate-dalle-image", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.get("/api/v1/ai/result")
+async def get_task_result(task_id: str):
+    print(f"[API] get_task_result called for {task_id}")
+    if task_id not in task_results:
+        print(f"[API][ERROR] {task_id} not found")
+        return JSONResponse(content={"success": False, "error": "Result not ready or invalid task_id"}, status_code=404)
+    result = task_results[task_id]
+    if isinstance(result, dict) and result.get("stream"):
+        resp = result["stream"]
+        print(f"[API] StreamingResponse for {task_id}")
+        return StreamingResponse(resp, media_type=result["media_type"])
+    else:
+        print(f"[API] JSONResponse for {task_id}, success={result.get('success')}")
+        return JSONResponse(content=result)
