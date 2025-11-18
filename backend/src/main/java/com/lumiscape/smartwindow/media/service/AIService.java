@@ -28,8 +28,12 @@ public class AIService {
     private String aiServerUrl;
 
     @Async("taskExecutor")
-    public void requestAIGeneration(Media originMedia) {
+    public void requestAIGeneration(Media originMedia, Long deviceId) {
         String presignedDownloadUrl = s3Service.generatePresignedUrlForDownload(originMedia.getFileUrl());
+
+        // TODO improve music part
+        callAiServer(originMedia.getId(), "/api/v1/ai/recommend-music",
+                new AIRequest(originMedia.getId(), presignedDownloadUrl, deviceId.toString(), "MUSIC"));
 
         List<MediaOrigin> aiTypesToGenerate = List.of(
                 MediaOrigin.AI_RP,

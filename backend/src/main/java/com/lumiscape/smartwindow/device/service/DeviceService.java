@@ -261,6 +261,14 @@ public class DeviceService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
     }
 
+    // TODO improve music part
+    public String findById(Long deviceId) {
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+
+        return device.getDeviceUniqueId();
+    }
+
     public void publishMediaUpdateToDevice(Device device) {
         Media media = device.getMedia();
 
@@ -293,7 +301,6 @@ public class DeviceService {
         payload.put("musicId", musicId);
         payload.put("musicUrl", musicUrl);
 
-        log.info("????00");
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
 }

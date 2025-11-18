@@ -89,7 +89,8 @@ public class MediaService {
 
         Media savedMedia = mediaRepository.save(media);
 
-        aiService.requestAIGeneration(savedMedia);
+        // TODO remove deviceId
+        aiService.requestAIGeneration(savedMedia, request.deviceId());
 
         eventPublisher.publishEvent(new MediaUploadEvent(
                 userId,
