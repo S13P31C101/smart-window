@@ -148,7 +148,7 @@ def sync_notify_ai_callback(media_id: int, target_s3_key: str):
     print(f"[CALLBACK] Notifying BE for key={target_s3_key} (media_id={media_id})...")
     headers = {"X-AI-Token": AI_TOKEN}
     callback_payload = {
-        "parentMediaId": str(media_id),
+        "parentMediaId": media_id,
         "s3ObjectKey": target_s3_key,
         "fileType": "IMAGE"
     }
