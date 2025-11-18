@@ -2,14 +2,12 @@ package com.lumiscape.smartwindow.device.controller;
 
 import com.lumiscape.smartwindow.alarm.dto.AlarmResponse;
 import com.lumiscape.smartwindow.alarm.service.AlarmService;
-import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.dto.*;
 import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -57,6 +55,7 @@ public class DeviceController {
     @DeleteMapping("/{device-id}")
     public ApiResponse<?> deleteDevice(@AuthenticationPrincipal Long userId,
                                        @PathVariable("device-id") Long deviceId) {
+        deviceService.deleteDevice(userId, deviceId);
 
         return ApiResponse.onSuccess();
     }

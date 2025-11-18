@@ -2,7 +2,7 @@ package com.lumiscape.smartwindow.media.dto;
 
 import com.lumiscape.smartwindow.media.domain.MediaType;
 
-public record MediaRegisterRequest(
+public record MediaRegisterRequest_Edit(
         Long deviceId,
         String s3ObjectKey,
         String fileName,
