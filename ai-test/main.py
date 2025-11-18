@@ -2,11 +2,11 @@ import os
 import uuid
 import asyncio
 import json
+import time
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 import utils
-import time
 
 load_dotenv()
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
@@ -25,7 +25,32 @@ async def startup_event():
     asyncio.create_task(main_worker())
     print("[SYSTEM] Both workers launched")
 
-# ------------ 워커 정의 --------------
+# --- 보조 함수 ---
+async def download_image_bytes(download_url):
+    print(f"[DOWNLOAD] >> download_image_bytes called ({download_url})")
+    try:
+        print("[DOWNLOAD] >> Creating AsyncClient")
+        async with utils.httpx.AsyncClient(timeout=30.0) as client:
+            print("[DOWNLOAD] >> before GET call")
+            try:
+                resp = await client.get(download_url)
+                print(f"[DOWNLOAD] >> after GET call, status={resp.status_code}")
+            except Exception as e:
+                print(f"[DOWNLOAD][EXCEPTION] in GET call: {e}")
+                raise
+            if resp.status_code == 200:
+                print(f"[DOWNLOAD] >> Success. Bytes={len(resp.content)}")
+                return resp.content
+            else:
+                print(f"[DOWNLOAD][ERROR] Download fail ({resp.status_code}) url={download_url}")
+                return None
+    except Exception as e:
+        print(f"[DOWNLOAD][ERROR] Exception (outer): {e}")
+        return None
+    finally:
+        print("[DOWNLOAD] >> Download function finished (finally block)")
+
+# --- worker들 ---
 
 async def music_worker():
     print("[WORKER-MUSIC] >>> Worker started")
@@ -39,10 +64,12 @@ async def music_worker():
             print(f"[WORKER-MUSIC] >>> Processing task_id={task_id}, request keys: {list(request.keys())}")
             download_url = request.get("downloadUrl")
             print(f"[WORKER-MUSIC] >>> Downloading image from: {download_url}")
+            # --- download diagnostic ---
             image_bytes = await download_image_bytes(download_url)
             if not image_bytes:
                 print(f"[WORKER-MUSIC][ERROR] Image download failed for task_id={task_id}")
                 task_results[task_id] = {"success": False, "error": "Image download failed (expired S3 link?)"}
+                music_queue.task_done()  # 반드시 호출!
                 continue
             request['image_bytes'] = image_bytes
             print(f"[WORKER-MUSIC] >>> Image download complete. Bytes: {len(image_bytes)}")
@@ -94,27 +121,7 @@ async def main_worker():
             print(f"[WORKER-MAIN] >>> task_done for {task_id}, queue size now: {main_queue.qsize()}")
             main_queue.task_done()
 
-# ---------- 보조 함수 -------------
-
-async def download_image_bytes(download_url):
-    print(f"[DOWNLOAD] >> download_image_bytes called ({download_url})")
-    try:
-        async with utils.httpx.AsyncClient(timeout=30.0) as client:
-            print(f"[DOWNLOAD] >> before GET call")
-            resp = await client.get(download_url)
-            print(f"[DOWNLOAD] >> after GET call, status={resp.status_code}")
-            if resp.status_code == 200:
-                print(f"[DOWNLOAD] >> Success. Bytes={len(resp.content)}")
-                return resp.content
-            else:
-                print(f"[DOWNLOAD][ERROR] Download fail ({resp.status_code}) url={download_url}")
-                return None
-    except Exception as e:
-        print(f"[DOWNLOAD][ERROR] Exception: {e}")
-        return None
-
-
-# ---------- API 엔드포인트 --------------
+# --- API ---
 
 @app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
@@ -133,7 +140,6 @@ async def remove_person_and_upload(request: dict = Body(...)):
 @app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict = Body(...)):
     print(f"[QUEUE INPUT] recommend-music request (pre-download put): {json.dumps(request, indent=2)}")
-    # -- 이미지 다운로드는 워커에서 실행! --
     task_id = str(uuid.uuid4())
     print(f"[QUEUE INPUT] Putting to music_queue (recommend-music) task_id={task_id}")
     await music_queue.put((task_id, request))
