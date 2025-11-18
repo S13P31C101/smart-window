@@ -13,10 +13,11 @@ CREATE TYPE social_provider_enum AS ENUM (
 );
 
 CREATE TYPE device_mode_enum AS ENUM (
-    'AUTO_MODE', 
-    'DARK_MODE', 
-    'SLEEP_MODE',
-    'CUSTOM_MODE'
+    'MENU_MODE'
+    'CUSTOM_MODE',
+    'AUTO_MODE',
+    'PRIVACY_MODE', 
+    'GLASS_MODE'
 );
 
 CREATE TYPE media_type_enum AS ENUM (
@@ -95,7 +96,7 @@ CREATE TABLE devices (
     device_name VARCHAR(100) NOT NULL,
     power_status BOOLEAN DEFAULT FALSE NOT NULL,
     open_status BOOLEAN DEFAULT FALSE NOT NULL,
-    mode_status device_mode_enum DEFAULT 'AUTO_MODE' NOT NULL,
+    mode_status device_mode_enum DEFAULT 'MENU_MODE' NOT NULL,
     mode_settings JSONB NULL,
     media_id BIGINT NULL REFERENCES media(id) ON DELETE SET NULL,
     music_id BIGINT NULL REFERENCES musics(id) ON DELETE SET NULL,
