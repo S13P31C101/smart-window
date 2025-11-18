@@ -92,13 +92,19 @@ async def search_youtube_music(query: str):
         return None
 
 async def notify_music_callback(media_id: int, device_id: str, music_url: str):
-    print(f"[MUSIC CALLBACK] Notifying for media_id={media_id}, device_id={device_id}, music_url={music_url}")
-    timeout = httpx.Timeout(30.0, read=30.0)
+    import json
+    print(f"[MUSIC CALLBACK] --- Preparing callback ---")
+    print(f"[MUSIC CALLBACK] Target URL: {AI_MUSIC_CALLBACK_URL}")
+
     payload = {
-        "mediaId": media_id,
-        "deviceId": device_id,
+        "mediaId": int(media_id),      # 반드시 int
+        "deviceId": str(device_id),    # 반드시 string화
         "musicUrl": music_url
     }
+
+    print(f"[MUSIC CALLBACK] Payload: {json.dumps(payload, indent=2)}")
+
+    timeout = httpx.Timeout(30.0, read=30.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(AI_MUSIC_CALLBACK_URL, json=payload)
         print(f"[MUSIC_CALLBACK] Status: {resp.status_code}")
