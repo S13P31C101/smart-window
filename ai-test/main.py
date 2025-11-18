@@ -100,7 +100,9 @@ async def download_image_bytes(download_url):
     print(f"[DOWNLOAD] >> download_image_bytes called ({download_url})")
     try:
         async with utils.httpx.AsyncClient(timeout=30.0) as client:
+            print(f"[DOWNLOAD] >> before GET call")
             resp = await client.get(download_url)
+            print(f"[DOWNLOAD] >> after GET call, status={resp.status_code}")
             if resp.status_code == 200:
                 print(f"[DOWNLOAD] >> Success. Bytes={len(resp.content)}")
                 return resp.content
@@ -110,6 +112,7 @@ async def download_image_bytes(download_url):
     except Exception as e:
         print(f"[DOWNLOAD][ERROR] Exception: {e}")
         return None
+
 
 # ---------- API 엔드포인트 --------------
 
