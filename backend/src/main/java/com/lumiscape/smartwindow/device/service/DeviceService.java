@@ -140,7 +140,7 @@ public class DeviceService {
 
         DeviceMode newMode = DeviceMode.valueOf(request.mode().toUpperCase());
 
-        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", newMode.name());
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", Map.of("status", newMode.name()));
 
         device.updateMode(newMode);
 
@@ -150,9 +150,15 @@ public class DeviceService {
     @Transactional
     public DeviceModeSettingsResponse controlModeSettings(Long userId, Long deviceId, DeviceModeSettingsRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
-        Map<String, Object> newSettings = request.settings();
+        Map<String, Object> newSettings = Map.of("widgetClock", request.widgetClock(),
+                "widgetWeather", request.widgetWeather(),
+                "widgetQuotes", request.widgetQuotes(),
+                "widgetMusic", request.widgetMusic());
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "widgets", newSettings);
 
         device.updateModeSettings(newSettings);
+        log.info(newSettings.toString());
 
         return DeviceModeSettingsResponse.from(device);
     }
