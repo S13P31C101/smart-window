@@ -19,11 +19,11 @@ Item {
         }
     }
 
-    // Background - Image or fallback
+    // Background - Image or fallback to default.png
     Image {
         id: backgroundImage
         anchors.fill: parent
-        source: appConfig.currentMediaUrl || ""
+        source: appConfig.currentMediaUrl || "qrc:/assets/images/scenes/default.png"
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: false
@@ -42,10 +42,10 @@ Item {
             }
         }
 
-        // Fallback background when no media
+        // Fallback background when image fails (not shown for default.png)
         Rectangle {
             anchors.fill: parent
-            visible: backgroundImage.status === Image.Null || backgroundImage.source === ""
+            visible: backgroundImage.status === Image.Null && backgroundImage.source === ""
             gradient: Gradient {
                 GradientStop { position: 0.0; color: "#0f172a" }
                 GradientStop { position: 0.5; color: "#1e293b" }
@@ -92,10 +92,24 @@ Item {
     Item {
         id: guideScreen
         anchors.fill: parent
-        // Hide guide when either media or YouTube URL is provided
-        visible: (!appConfig.currentMediaUrl || appConfig.currentMediaUrl === "") &&
+        // Show guide initially, then hide after timer or when media/YouTube URL is provided
+        property bool manuallyHidden: false
+        visible: !manuallyHidden &&
+                 (!appConfig.currentMediaUrl || appConfig.currentMediaUrl === "") &&
                  (!appConfig.currentYoutubeUrl || appConfig.currentYoutubeUrl === "")
         z: 100  // Ensure guide screen is on top when visible
+
+        // 10-second auto-hide timer
+        Timer {
+            id: guideTimer
+            interval: 10000  // 10 seconds
+            running: false
+            repeat: false
+            onTriggered: {
+                console.log("Guide screen auto-hiding after 10 seconds")
+                guideScreen.manuallyHidden = true
+            }
+        }
 
         // Monitor media URL changes
         Connections {
@@ -115,6 +129,23 @@ Item {
             console.log("  currentMediaUrl:", appConfig.currentMediaUrl)
             console.log("  currentYoutubeUrl:", appConfig.currentYoutubeUrl)
             console.log("  Guide visible:", guideScreen.visible)
+
+            // Start 10-second timer if in initial state (no media/music)
+            if (guideScreen.visible) {
+                console.log("Starting 10-second guide screen auto-hide timer")
+                guideTimer.start()
+            }
+        }
+
+        // Reset timer when screen becomes visible again
+        onVisibleChanged: {
+            if (visible) {
+                guideScreen.manuallyHidden = false
+                guideTimer.restart()
+                console.log("Guide screen visible again - restarting timer")
+            } else {
+                guideTimer.stop()
+            }
         }
 
         // Semi-transparent overlay for better card visibility
@@ -312,45 +343,49 @@ Item {
         spacing: 20
         z: 50  // Above background, below guide screen
 
-        // 시계 위젯
+        // 시계 위젯 - MQTT 제어
         ClockWidget {
             id: clockWidget
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: true
+            visible: appConfig.widgetClock
         }
 
-        // 날씨 위젯
+        // 날씨 위젯 - MQTT 제어
         WeatherWidget {
             id: weatherWidget
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: true
+            visible: appConfig.widgetWeather
         }
 
-        // 명언 위젯 (날씨 바로 밑)
+        // 명언 위젯 - MQTT 제어
         QuoteWidget {
             id: quoteWidget
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: widgetRegistry.isWidgetActive("quote")
+            visible: appConfig.widgetQuotes
         }
     }
 
     // YouTube 입력 영역 제거 - MQTT로만 제어
 
-    // ====== YouTube Player (하단 중앙) ======
-    YouTubePlayer {
-        id: youtubePlayer
+    // ====== YouTube Audio Player (하단 중앙) - yt-dlp based, MQTT 제어 ======
+    YouTubeAudioWidget {
+        id: youtubeAudioWidget
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: parent.height * 0.05
-        width: Math.min(parent.width * 0.45, 500)  // Compact size
-        height: 160
+        width: Math.min(parent.width * 0.55, 700)
+        height: 200
         youtubeUrl: root.currentYoutubeUrl
-        visible: root.currentYoutubeUrl !== ""
-        z: 60  // Above all other widgets to prevent being covered by background
+        visible: appConfig.widgetMusic && root.currentYoutubeUrl !== ""
+        z: 60
+
+        onPlayerReady: {
+            console.log("YouTube audio player ready in Custom Mode")
+        }
     }
 
-    // Spotify removed - using YouTube player for music
-    // CustomModeScreen uses MQTT-controlled YouTube player only
+    // Spotify removed - using YouTube audio player for music
+    // CustomModeScreen uses MQTT-controlled YouTube audio player (yt-dlp based)
 
     // Back button - Gesture controlled and vertically centered
     GestureControlledUI {

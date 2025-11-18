@@ -123,6 +123,42 @@ void AppConfig::setCurrentYoutubeUrl(const QString &url)
     }
 }
 
+void AppConfig::setWidgetClock(bool enabled)
+{
+    if (m_widgetClock != enabled) {
+        m_widgetClock = enabled;
+        emit widgetClockChanged();
+        qInfo() << "Widget Clock:" << (enabled ? "enabled" : "disabled");
+    }
+}
+
+void AppConfig::setWidgetWeather(bool enabled)
+{
+    if (m_widgetWeather != enabled) {
+        m_widgetWeather = enabled;
+        emit widgetWeatherChanged();
+        qInfo() << "Widget Weather:" << (enabled ? "enabled" : "disabled");
+    }
+}
+
+void AppConfig::setWidgetQuotes(bool enabled)
+{
+    if (m_widgetQuotes != enabled) {
+        m_widgetQuotes = enabled;
+        emit widgetQuotesChanged();
+        qInfo() << "Widget Quotes:" << (enabled ? "enabled" : "disabled");
+    }
+}
+
+void AppConfig::setWidgetMusic(bool enabled)
+{
+    if (m_widgetMusic != enabled) {
+        m_widgetMusic = enabled;
+        emit widgetMusicChanged();
+        qInfo() << "Widget Music:" << (enabled ? "enabled" : "disabled");
+    }
+}
+
 QString AppConfig::applicationDirPath() const
 {
     return QCoreApplication::applicationDirPath();
