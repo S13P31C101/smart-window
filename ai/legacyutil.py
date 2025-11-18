@@ -1,14 +1,13 @@
 import os
 import io
 import json
-import numpy as np
+import gc
 import cv2
+import numpy as np
 import torch
 import httpx
-from PIL import Image
 import traceback
-import gc
-
+from PIL import Image
 from dotenv import load_dotenv
 from ultralytics import YOLO
 from diffusers import StableDiffusionInpaintPipeline
@@ -29,6 +28,7 @@ GMS_API_KEY = os.getenv("GMS_API_KEY")
 AI_TOKEN = os.getenv("AI_TOKEN")
 AI_UPLOAD_URL = os.getenv("AI_UPLOAD_URL")
 AI_CALLBACK_URL = os.getenv("AI_CALLBACK_URL")
+AI_MUSIC_CALLBACK_URL = os.getenv("AI_MUSIC_CALLBACK_URL")
 GMS_KEY = os.getenv("GMS_API_KEY")
 
 device_type = "cuda" if torch.cuda.is_available() else "cpu"
@@ -66,6 +66,8 @@ def extract_mood_caption(image_bytes: bytes) -> str:
     print(f"[MOOD CAPTION] Extracted: {caption}")
     return caption
 
+import json
+
 async def search_youtube_music(query: str):
     print(f"[YOUTUBE] Searching music for: {query}")
     YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
@@ -73,14 +75,20 @@ async def search_youtube_music(query: str):
         "part": "snippet",
         "q": query,
         "type": "video",
-        "videoCategoryId": "10",
+        "videoCategoryId": "10",        # 음악 카테고리 (실패시 주석/수정 테스트)
         "maxResults": 1,
         "key": YOUTUBE_API_KEY,
-        "videoDuration": "medium"
+        "videoDuration": "medium"       # "any"로 완화도 가능
     }
+    print(f"[YOUTUBE][DEBUG] Request params: {params}")
+
     async with httpx.AsyncClient() as client:
         r = await client.get(YOUTUBE_SEARCH_URL, params=params)
         data = r.json()
+    print(f"[YOUTUBE][DEBUG] Response keys: {list(data.keys())}")
+    print(f"[YOUTUBE][DEBUG] items: {data.get('items')}")
+    print(f"[YOUTUBE][DEBUG] Response JSON (part): {json.dumps(data, ensure_ascii=False)[:500]}")
+
     if "items" in data and len(data["items"]) > 0:
         video_id = data["items"][0]["id"]["videoId"]
         video_title = data["items"][0]["snippet"]["title"]
@@ -88,8 +96,30 @@ async def search_youtube_music(query: str):
         print(f"[YOUTUBE] Found: {video_title}, {video_url}")
         return {"title": video_title, "url": video_url}
     else:
-        print(f"[YOUTUBE][ERROR] No matching content found.")
+        print(f"[YOUTUBE][ERROR] No matching content found. Full response: {json.dumps(data, ensure_ascii=False)}")
         return None
+
+
+async def notify_music_callback(media_id: int, device_id: str, music_url: str):
+    import json
+    print(f"[MUSIC CALLBACK] --- Preparing callback ---")
+    print(f"[MUSIC CALLBACK] Target URL: {AI_MUSIC_CALLBACK_URL}")
+
+    payload = {
+        "mediaId": int(media_id),      # 반드시 int
+        "deviceId": str(device_id),    # 반드시 string화
+        "musicUrl": music_url
+    }
+
+    print(f"[MUSIC CALLBACK] Payload: {json.dumps(payload, indent=2)}")
+
+    timeout = httpx.Timeout(30.0, read=30.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(AI_MUSIC_CALLBACK_URL, json=payload)
+        print(f"[MUSIC_CALLBACK] Status: {resp.status_code}")
+        print(f"[MUSIC_CALLBACK] Body: {resp.text}")
+        if resp.status_code not in (200, 201):
+            raise Exception(f"AI music callback failed: status={resp.status_code}, {resp.text}")
 
 def expand_box(box, image_shape, scale=0.1):
     x1, y1, x2, y2 = box
@@ -121,41 +151,6 @@ def sync_inpaint_image(image_np, mask_np):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return result
-
-def sync_request_ai_upload_url(target_s3_key: str) -> dict:
-    print(f"[S3] Requesting presigned upload URL for key={target_s3_key}")
-    headers = {"X-AI-Token": AI_TOKEN}
-    resp = httpx.post(AI_UPLOAD_URL, json={"s3ObjectKey": target_s3_key}, headers=headers, timeout=30.0)
-    resp.raise_for_status()
-    response_json = resp.json()
-    if response_json.get("status") == 200 and "data" in response_json:
-        print(f"[S3] Presigned URL acquired.")
-        return response_json["data"]
-    else:
-        print(f"[S3][ERROR] Invalid response: {response_json}")
-        raise Exception("Invalid response structure from AI upload URL")
-
-def sync_upload_to_s3(file_url: str, image_buffer: io.BytesIO):
-    print(f"[S3] Uploading to {file_url} ...")
-    headers = {"Content-Type": "image/png"}
-    resp = httpx.put(file_url, content=image_buffer.getvalue(), headers=headers, timeout=60.0)
-    if resp.status_code not in (200, 201):
-        print(f"[S3][ERROR] Upload returned: {resp.status_code}")
-        raise Exception(f"S3 upload failed with status code {resp.status_code}")
-    print(f"[S3] Upload complete.")
-
-def sync_notify_ai_callback(media_id: int, target_s3_key: str):
-    print(f"[CALLBACK] Notifying BE for key={target_s3_key} (media_id={media_id})...")
-    headers = {"X-AI-Token": AI_TOKEN}
-    callback_payload = {
-        "parentMediaId": media_id,
-        "s3ObjectKey": target_s3_key,
-        "fileType": "IMAGE"
-    }
-    resp = httpx.post(AI_CALLBACK_URL, json=callback_payload, headers=headers, timeout=30.0)
-    print(f"[CALLBACK] Status: {resp.status_code}, body: {resp.text}")
-    if resp.status_code not in (200, 201):
-        raise Exception(f"AI callback to BE failed: {resp.status_code}, {resp.text}")
 
 async def download_image(url: str) -> np.ndarray:
     print(f"[DOWNLOAD] (async) Downloading from {url}")
@@ -308,7 +303,6 @@ def handle_remove_person(request):
     if not media_id or not image_bytes or not target_s3_key:
         return {"success": False, "error": "mediaId, image_bytes, and targetAIS3Key are required"}
     try:
-        # 이미지를 np.ndarray로 변환
         img_np = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
         height, width = img_np.shape[:2]
         mask = np.zeros((height, width), np.uint8)
@@ -343,13 +337,17 @@ def handle_remove_person(request):
 async def handle_recommend_music(request):
     print("[HANDLE] handle_recommend_music:", json.dumps({k: v if k!="image_bytes" else f"<{len(v)} bytes>" for k,v in request.items()}, indent=2))
     image_bytes = request.get("image_bytes")
-    if not image_bytes:
-        return {"success": False, "error": "image_bytes is required"}
+    media_id = request.get("mediaId")
+    device_id = request.get("deviceId") or request.get("targetAIS3Key")
+    if not image_bytes or not media_id or not device_id:
+        return {"success": False, "error": "image_bytes, mediaId, deviceId are required"}
     try:
         caption = extract_mood_caption(image_bytes)
         result = await search_youtube_music(caption + " piano music")
         if result:
-            return {"success": True, "message": f"Found song '{result['title']}'", "youtube_url": result["url"], "mood_caption": caption}
+            music_url = result["url"]
+            await notify_music_callback(media_id, device_id, music_url)
+            return {"success": True, "message": f"Found song '{result['title']}'", "youtube_url": music_url, "mood_caption": caption}
         else:
             return {"success": False, "message": "No matching music found.", "mood_caption": caption}
     except Exception as e:
@@ -417,3 +415,38 @@ async def handle_generate_dalle_image(request):
         tb = traceback.format_exc()
         print(f"[DALLE][ERROR] {tb}")
         return {"success": False, "error": str(e), "traceback": tb}
+
+def sync_request_ai_upload_url(target_s3_key: str) -> dict:
+    print(f"[S3] Requesting presigned upload URL for key={target_s3_key}")
+    headers = {"X-AI-Token": AI_TOKEN}
+    resp = httpx.post(AI_UPLOAD_URL, json={"s3ObjectKey": target_s3_key}, headers=headers, timeout=30.0)
+    resp.raise_for_status()
+    response_json = resp.json()
+    if response_json.get("status") == 200 and "data" in response_json:
+        print(f"[S3] Presigned URL acquired.")
+        return response_json["data"]
+    else:
+        print(f"[S3][ERROR] Invalid response: {response_json}")
+        raise Exception("Invalid response structure from AI upload URL")
+
+def sync_upload_to_s3(file_url: str, image_buffer: io.BytesIO):
+    print(f"[S3] Uploading to {file_url} ...")
+    headers = {"Content-Type": "image/png"}
+    resp = httpx.put(file_url, content=image_buffer.getvalue(), headers=headers, timeout=60.0)
+    if resp.status_code not in (200, 201):
+        print(f"[S3][ERROR] Upload returned: {resp.status_code}")
+        raise Exception(f"S3 upload failed with status code {resp.status_code}")
+    print(f"[S3] Upload complete.")
+
+def sync_notify_ai_callback(media_id: int, target_s3_key: str):
+    print(f"[CALLBACK] Notifying BE for key={target_s3_key} (media_id={media_id})...")
+    headers = {"X-AI-Token": AI_TOKEN}
+    callback_payload = {
+        "parentMediaId": media_id,
+        "s3ObjectKey": target_s3_key,
+        "fileType": "IMAGE"
+    }
+    resp = httpx.post(AI_CALLBACK_URL, json=callback_payload, headers=headers, timeout=30.0)
+    print(f"[CALLBACK] Status: {resp.status_code}, body: {resp.text}")
+    if resp.status_code not in (200, 201):
+        raise Exception(f"AI callback to BE failed: {resp.status_code}, {resp.text}")
