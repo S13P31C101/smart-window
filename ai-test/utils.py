@@ -299,18 +299,53 @@ async def gms_dalle_generate_image(prompt: str) -> str:
             print(f"[DALLE][ERROR] Parse failed, data={data}")
             raise Exception(f"이미지 파싱 실패: {e}\n전체 응답: {data}")
 
-async def handle_recommend_music(request):
-    print("[HANDLE] handle_recommend_music:", json.dumps(request, indent=2))
-    download_url = request.get("downloadUrl")
-    if not download_url:
-        return {"success": False, "error": "downloadUrl is required"}
+def handle_remove_person(request):
+    import base64
+    print("[HANDLE] handle_remove_person:", json.dumps({k: v if k!="image_bytes" else f"<{len(v)} bytes>" for k,v in request.items()}, indent=2))
+    media_id = request.get("mediaId")
+    target_s3_key = request.get("targetAIS3Key")
+    image_bytes = request.get("image_bytes")
+    if not media_id or not image_bytes or not target_s3_key:
+        return {"success": False, "error": "mediaId, image_bytes, and targetAIS3Key are required"}
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(download_url)
-            if resp.status_code != 200:
-                print(f"[HANDLE][ERROR] Could not download image, status={resp.status_code}")
-                return {"success": False, "error": "Failed to download image"}
-            image_bytes = resp.content
+        # 이미지를 np.ndarray로 변환
+        img_np = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        height, width = img_np.shape[:2]
+        mask = np.zeros((height, width), np.uint8)
+        results = yolo_model.predict(img_np)
+        for r in results:
+            for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
+                if int(cls) == 0:
+                    box_expanded = expand_box(box, img_np.shape, scale=0.1)
+                    x1, y1, x2, y2 = map(int, box_expanded)
+                    mask[y1:y2, x1:x2] = 255
+        inpainted = sync_inpaint_image(img_np, mask)
+        buffer = io.BytesIO()
+        inpainted.save(buffer, format="PNG")
+        buffer.seek(0)
+        ai_upload_data = sync_request_ai_upload_url(target_s3_key)
+        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
+            return {"success": False, "error": "S3 object key mismatch or missing in AI upload URL response"}
+        file_url = ai_upload_data.get("fileUrl")
+        if not file_url:
+            return {"success": False, "error": "fileUrl missing in AI upload URL response"}
+        sync_upload_to_s3(file_url, buffer)
+        sync_notify_ai_callback(media_id, target_s3_key)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        return {"success": True, "result_s3_key": target_s3_key, "result_s3_url": file_url}
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[HANDLE][ERROR] {tb}")
+        return {"success": False, "error": str(e), "traceback": tb}
+
+async def handle_recommend_music(request):
+    print("[HANDLE] handle_recommend_music:", json.dumps({k: v if k!="image_bytes" else f"<{len(v)} bytes>" for k,v in request.items()}, indent=2))
+    image_bytes = request.get("image_bytes")
+    if not image_bytes:
+        return {"success": False, "error": "image_bytes is required"}
+    try:
         caption = extract_mood_caption(image_bytes)
         result = await search_youtube_music(caption + " piano music")
         if result:
@@ -322,92 +357,30 @@ async def handle_recommend_music(request):
         print(f"[HANDLE][ERROR] {tb}")
         return {"success": False, "error": str(e), "traceback": tb}
 
-def handle_remove_person(request):
-    print("[HANDLE] handle_remove_person:", json.dumps(request, indent=2))
-    media_id = request.get("mediaId")
-    download_url = request.get("downloadUrl")
-    target_s3_key = request.get("targetAIS3Key")
-    if not media_id or not download_url or not target_s3_key:
-        return {"success": False, "error": "mediaId, downloadUrl, and targetAIS3Key are required"}
-    try:
-        print("[HANDLE] Downloading image for remove-person (sync)...")
-        image = sync_download_image(download_url)
-        height, width = image.shape[:2]
-        mask = np.zeros((height, width), np.uint8)
-        results = yolo_model.predict(image)
-        for r in results:
-            for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
-                if int(cls) == 0:
-                    box_expanded = expand_box(box, image.shape, scale=0.1)
-                    x1, y1, x2, y2 = map(int, box_expanded)
-                    mask[y1:y2, x1:x2] = 255
-        print("[HANDLE] Inpainting sync...")
-        inpainted_image = sync_inpaint_image(image, mask)
-        buffer = io.BytesIO()
-        inpainted_image.save(buffer, format="PNG")
-        buffer.seek(0)
-        print("[HANDLE] Requesting S3 upload URL (sync)...")
-        ai_upload_data = sync_request_ai_upload_url(target_s3_key)
-        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-            print(f"[HANDLE][ERROR] S3 key mismatch.")
-            return {"success": False, "error": "S3 object key mismatch or missing in AI upload URL response"}
-        file_url = ai_upload_data.get("fileUrl")
-        if not file_url:
-            print(f"[HANDLE][ERROR] fileUrl missing in upload URL.")
-            return {"success": False, "error": "fileUrl missing in AI upload URL response"}
-        sync_upload_to_s3(file_url, buffer)
-        sync_notify_ai_callback(media_id, target_s3_key)
-        print("[HANDLE] remove-person completed.")
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        return {"success": True, "result_s3_key": target_s3_key, "result_s3_url": file_url}
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(f"[HANDLE][ERROR] {tb}")
-        return {"success": False, "error": str(e), "traceback": tb}
-
 async def handle_scene_blend(request):
-    print("[HANDLE] handle_scene_blend:", json.dumps(request, indent=2))
+    print("[HANDLE] handle_scene_blend:", json.dumps({k: v if k!="image_bytes" else f"<{len(v)} bytes>" for k,v in request.items()}, indent=2))
     media_id = request.get("mediaId")
-    download_url = request.get("downloadUrl")
     target_s3_key = request.get("targetAIS3Key")
     scene_type = (request.get("sceneType") or "night").lower().strip()
-    print(f"[HANDLE] Params: media_id={media_id}, scene_type={scene_type}")
+    image_bytes = request.get("image_bytes")
+    if not media_id or not image_bytes or not target_s3_key or not scene_type:
+        return {"success": False, "error": "mediaId, image_bytes, sceneType, and targetAIS3Key are required"}
     try:
-        print(f"[HANDLE] Downloading image for scene-blend: {download_url}")
-        image = await download_image(download_url)
-        print(f"[DEBUG] image.shape={getattr(image, 'shape', 'N/A')}, dtype={getattr(image, 'dtype', 'N/A')}")
-        print("[HANDLE] Calculating sky mask...")
-        sky_mask = await sky_mask_segformer(image)
-        print(f"[DEBUG] sky_mask.shape={getattr(sky_mask, 'shape', 'N/A')}, sky_mask dtype={getattr(sky_mask, 'dtype', 'N/A')}, unique={np.unique(sky_mask) if isinstance(sky_mask, np.ndarray) else 'N/A'}")
+        img_np = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+        sky_mask = await sky_mask_segformer(img_np)
         prompt = get_scene_prompt(scene_type)
-        print(f"[HANDLE] Start inpainting with prompt: '{prompt}'")
-        result = None
-        try:
-            result = inpaint_image_with_prompt(image, sky_mask, prompt, mask_is_sky=True)
-        except Exception as e:
-            tb = traceback.format_exc()
-            print("[HANDLE][INPAINT][ERROR]", tb)
-            return {"success": False, "error": str(e), "traceback": tb}
-        print("[HANDLE] Inpainting complete; saving to buffer.")
+        result = inpaint_image_with_prompt(img_np, sky_mask, prompt, mask_is_sky=True)
         buffer = io.BytesIO()
         result.save(buffer, format="PNG")
         buffer.seek(0)
-        print("[HANDLE] Requesting S3 upload URL...")
         ai_upload_data = await request_ai_upload_url(target_s3_key)
         if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-            print(f"[HANDLE][ERROR] S3 key mismatch.")
             return {"success": False, "error": "S3 object key mismatch or missing in AI upload URL response"}
         file_url = ai_upload_data.get("fileUrl")
         if not file_url:
-            print(f"[HANDLE][ERROR] fileUrl missing in upload URL.")
             return {"success": False, "error": "fileUrl missing in AI upload URL response"}
-        print("[HANDLE] Uploading to S3...")
         await upload_to_s3(file_url, buffer)
-        print("[HANDLE] Sending AI callback...")
         await notify_ai_callback(media_id, target_s3_key)
-        print("[HANDLE] scene-blend completed.")
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
