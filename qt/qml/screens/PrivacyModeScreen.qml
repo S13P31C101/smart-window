@@ -12,30 +12,37 @@ Item {
         color: Theme.backgroundDark
     }
 
-    // Centered message
+    // Main content area
     Column {
         anchors.centerIn: parent
-        spacing: Theme.spacingXl
+        width: Math.min(parent.width * 0.6, 600)
+        spacing: 40
 
-        Text {
+        // Privacy Mode Header
+        Column {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "🔒"
-            font.pixelSize: 120
-        }
+            spacing: Theme.spacingLg
 
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: "Privacy Mode Active"
-            font.pixelSize: Theme.fontSizeH2
-            font.weight: Theme.fontWeightBold
-            color: Theme.textPrimary
-        }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "🔑"
+                font.pixelSize: 80
+            }
 
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: "No content displayed for privacy"
-            font.pixelSize: Theme.fontSizeBody
-            color: Theme.textSecondary
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Privacy Mode"
+                font.pixelSize: Theme.fontSizeH2
+                font.weight: Theme.fontWeightBold
+                color: Theme.textPrimary
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Audio playback only - no visual content"
+                font.pixelSize: Theme.fontSizeBody
+                color: Theme.textSecondary
+            }
         }
     }
 

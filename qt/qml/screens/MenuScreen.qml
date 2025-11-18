@@ -115,8 +115,8 @@ Item {
     readonly property var modes: [
         { id: "custom",  label: "Custom Mode",  icon: "🎨", gradientA: "#a78bfa", gradientB: "#7dd3fc", textColor: "#1e293b" }, // purple→blue
         { id: "auto",    label: "Auto Mode",    icon: "💡", gradientA: "#3b82f6", gradientB: "#60a5fa", textColor: "#1e3a8a" }, // blue-600→blue-400
-        { id: "privacy", label: "Privacy Mode", icon: "🔒", gradientA: "#fcd34d", gradientB: "#fbbf24", textColor: "#78350f" }, // yellow-300→yellow-400
-        { id: "glass",   label: "Glass Mode",   icon: "🌫️", gradientA: "#fb923c", gradientB: "#fbbf24", textColor: "#78350f" }  // orange→yellow
+        { id: "privacy", label: "Privacy Mode", icon: "🔑", gradientA: "#fcd34d", gradientB: "#fbbf24", textColor: "#78350f" }, // yellow-300→yellow-400
+        { id: "glass",   label: "Glass Mode",   icon: "🔲", gradientA: "#fb923c", gradientB: "#fbbf24", textColor: "#78350f" }  // orange→yellow
     ]
 
     // 커서 좌표 (정규화 → 픽셀)
