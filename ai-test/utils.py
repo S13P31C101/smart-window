@@ -1,6 +1,5 @@
 import os
 import io
-import base64
 import json
 import numpy as np
 import cv2
@@ -8,6 +7,7 @@ import torch
 import httpx
 from PIL import Image
 import traceback
+import gc
 
 from dotenv import load_dotenv
 from ultralytics import YOLO
@@ -44,8 +44,6 @@ pipe = StableDiffusionInpaintPipeline.from_pretrained(
     "runwayml/stable-diffusion-inpainting",
     torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
 ).to(device_type)
-
-# ------------- Utility Functions(공통) -------------
 
 def sync_download_image(url: str) -> np.ndarray:
     print(f"[DOWNLOAD] Downloading image from {url}")
@@ -119,6 +117,9 @@ def sync_inpaint_image(image_np, mask_np):
     ).images[0]
     result = result.resize((input_width, input_height), Image.LANCZOS)
     print("[INPAINT] Inpainting finished.")
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     return result
 
 def sync_request_ai_upload_url(target_s3_key: str) -> dict:
@@ -156,7 +157,6 @@ def sync_notify_ai_callback(media_id: int, target_s3_key: str):
     if resp.status_code not in (200, 201):
         raise Exception(f"AI callback to BE failed: {resp.status_code}, {resp.text}")
 
-# 비동기 이미지 download
 async def download_image(url: str) -> np.ndarray:
     print(f"[DOWNLOAD] (async) Downloading from {url}")
     timeout = httpx.Timeout(30.0, read=30.0)
@@ -216,7 +216,6 @@ async def notify_ai_callback(media_id: int, target_s3_key: str):
             error_detail = f"status={resp.status_code}, response={resp.text}"
             raise Exception(f"AI callback to BE failed: {error_detail}")
 
-# -------- scene-blend 관련 함수 --------
 def get_scene_prompt(scene_type: str) -> str:
     scene_prompts = {
         "dawn": "dawn view, early morning soft light, misty atmosphere, calm and serene",
@@ -265,13 +264,15 @@ def inpaint_image_with_prompt(image_np, mask_np, prompt, mask_is_sky=False):
         ).images[0]
         print("[INPAINT] Done.")
         result = result.resize((input_width, input_height), Image.LANCZOS)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return result
     except Exception as e:
         tb = traceback.format_exc()
         print("[INPAINT][ERROR]", tb)
-        raise   # propagate to outer try-except in handle_scene_blend
+        raise
 
-# ------- DALL-E API --------
 async def gms_dalle_generate_image(prompt: str) -> str:
     print(f"[DALLE] Generating image for prompt: {prompt}")
     url = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/images/generations"
@@ -298,7 +299,6 @@ async def gms_dalle_generate_image(prompt: str) -> str:
             print(f"[DALLE][ERROR] Parse failed, data={data}")
             raise Exception(f"이미지 파싱 실패: {e}\n전체 응답: {data}")
 
-# -------- 큐 핸들러(리턴부 포함) --------
 async def handle_recommend_music(request):
     print("[HANDLE] handle_recommend_music:", json.dumps(request, indent=2))
     download_url = request.get("downloadUrl")
@@ -358,6 +358,9 @@ def handle_remove_person(request):
         sync_upload_to_s3(file_url, buffer)
         sync_notify_ai_callback(media_id, target_s3_key)
         print("[HANDLE] remove-person completed.")
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return {"success": True, "result_s3_key": target_s3_key, "result_s3_url": file_url}
     except Exception as e:
         tb = traceback.format_exc()
@@ -365,7 +368,6 @@ def handle_remove_person(request):
         return {"success": False, "error": str(e), "traceback": tb}
 
 async def handle_scene_blend(request):
-    import json
     print("[HANDLE] handle_scene_blend:", json.dumps(request, indent=2))
     media_id = request.get("mediaId")
     download_url = request.get("downloadUrl")
@@ -381,7 +383,6 @@ async def handle_scene_blend(request):
         print(f"[DEBUG] sky_mask.shape={getattr(sky_mask, 'shape', 'N/A')}, sky_mask dtype={getattr(sky_mask, 'dtype', 'N/A')}, unique={np.unique(sky_mask) if isinstance(sky_mask, np.ndarray) else 'N/A'}")
         prompt = get_scene_prompt(scene_type)
         print(f"[HANDLE] Start inpainting with prompt: '{prompt}'")
-        # shape/dtype/summary pre-inpainting
         result = None
         try:
             result = inpaint_image_with_prompt(image, sky_mask, prompt, mask_is_sky=True)
@@ -407,12 +408,14 @@ async def handle_scene_blend(request):
         print("[HANDLE] Sending AI callback...")
         await notify_ai_callback(media_id, target_s3_key)
         print("[HANDLE] scene-blend completed.")
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return {"success": True, "result_s3_key": target_s3_key, "result_s3_url": file_url}
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[HANDLE][ERROR] {tb}")
         return {"success": False, "error": str(e), "traceback": tb}
-
 
 async def handle_generate_dalle_image(request):
     print("[HANDLE] handle_generate_dalle_image:", json.dumps(request, indent=2))
