@@ -242,26 +242,34 @@ async def sky_mask_segformer(image_bgr: np.ndarray) -> np.ndarray:
     return sky_mask_resized
 
 def inpaint_image_with_prompt(image_np, mask_np, prompt, mask_is_sky=False):
-    print("[INPAINT] Custom prompt:", prompt)
-    input_height, input_width = image_np.shape[:2]
-    image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
-    if mask_is_sky:
-        mask_pil = Image.fromarray((mask_np.astype(np.uint8)*255)).convert("L")
-    else:
-        mask_pil = Image.fromarray(mask_np).convert("L")
-    image_pil_resized = image_pil.resize((512, 512), Image.LANCZOS)
-    mask_pil_resized = mask_pil.resize((512, 512), Image.NEAREST)
-    print("[INPAINT] Diffuser pipeline inpainting...")
-    result = pipe(
-        prompt=prompt,
-        image=image_pil_resized,
-        mask_image=mask_pil_resized,
-        guidance_scale=7.5,
-        num_inference_steps=50
-    ).images[0]
-    result = result.resize((input_width, input_height), Image.LANCZOS)
-    print("[INPAINT] Done.")
-    return result
+    try:
+        print(f"[INPAINT] Started (mask_is_sky={mask_is_sky})")
+        input_height, input_width = image_np.shape[:2]
+        image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
+        if mask_is_sky:
+            mask_pil = Image.fromarray((mask_np.astype(np.uint8)*255)).convert("L")
+        else:
+            mask_pil = Image.fromarray(mask_np).convert("L")
+        print(f"[INPAINT] image_pil size={image_pil.size}, mask_pil size={mask_pil.size}")
+        image_pil_resized = image_pil.resize((512, 512), Image.LANCZOS)
+        mask_pil_resized = mask_pil.resize((512, 512), Image.NEAREST)
+        print(f"[INPAINT] Resized -> image: {image_pil_resized.size}, mask: {mask_pil_resized.size}")
+        print(f"[INPAINT] Prompt: {prompt[:100]} ...")
+        print("[INPAINT] Calling StableDiffusionInpaintPipeline...")
+        result = pipe(
+            prompt=prompt,
+            image=image_pil_resized,
+            mask_image=mask_pil_resized,
+            guidance_scale=7.5,
+            num_inference_steps=50
+        ).images[0]
+        print("[INPAINT] Done.")
+        result = result.resize((input_width, input_height), Image.LANCZOS)
+        return result
+    except Exception as e:
+        tb = traceback.format_exc()
+        print("[INPAINT][ERROR]", tb)
+        raise   # propagate to outer try-except in handle_scene_blend
 
 # ------- DALL-E API --------
 async def gms_dalle_generate_image(prompt: str) -> str:
@@ -357,23 +365,33 @@ def handle_remove_person(request):
         return {"success": False, "error": str(e), "traceback": tb}
 
 async def handle_scene_blend(request):
+    import json
     print("[HANDLE] handle_scene_blend:", json.dumps(request, indent=2))
     media_id = request.get("mediaId")
     download_url = request.get("downloadUrl")
     target_s3_key = request.get("targetAIS3Key")
     scene_type = (request.get("sceneType") or "night").lower().strip()
-    if not media_id or not download_url or not target_s3_key or not scene_type:
-        return {"success": False, "error": "mediaId, downloadUrl, sceneType, and targetAIS3Key are required"}
+    print(f"[HANDLE] Params: media_id={media_id}, scene_type={scene_type}")
     try:
         print(f"[HANDLE] Downloading image for scene-blend: {download_url}")
         image = await download_image(download_url)
+        print(f"[DEBUG] image.shape={getattr(image, 'shape', 'N/A')}, dtype={getattr(image, 'dtype', 'N/A')}")
         print("[HANDLE] Calculating sky mask...")
         sky_mask = await sky_mask_segformer(image)
+        print(f"[DEBUG] sky_mask.shape={getattr(sky_mask, 'shape', 'N/A')}, sky_mask dtype={getattr(sky_mask, 'dtype', 'N/A')}, unique={np.unique(sky_mask) if isinstance(sky_mask, np.ndarray) else 'N/A'}")
         prompt = get_scene_prompt(scene_type)
-        print(f"[HANDLE] Start inpainting with prompt: {prompt}")
-        inpainted_image = inpaint_image_with_prompt(image, sky_mask, prompt, mask_is_sky=True)
+        print(f"[HANDLE] Start inpainting with prompt: '{prompt}'")
+        # shape/dtype/summary pre-inpainting
+        result = None
+        try:
+            result = inpaint_image_with_prompt(image, sky_mask, prompt, mask_is_sky=True)
+        except Exception as e:
+            tb = traceback.format_exc()
+            print("[HANDLE][INPAINT][ERROR]", tb)
+            return {"success": False, "error": str(e), "traceback": tb}
+        print("[HANDLE] Inpainting complete; saving to buffer.")
         buffer = io.BytesIO()
-        inpainted_image.save(buffer, format="PNG")
+        result.save(buffer, format="PNG")
         buffer.seek(0)
         print("[HANDLE] Requesting S3 upload URL...")
         ai_upload_data = await request_ai_upload_url(target_s3_key)
@@ -394,6 +412,7 @@ async def handle_scene_blend(request):
         tb = traceback.format_exc()
         print(f"[HANDLE][ERROR] {tb}")
         return {"success": False, "error": str(e), "traceback": tb}
+
 
 async def handle_generate_dalle_image(request):
     print("[HANDLE] handle_generate_dalle_image:", json.dumps(request, indent=2))
