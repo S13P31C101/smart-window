@@ -19,33 +19,30 @@ task_results = {}
 
 @app.on_event("startup")
 async def startup_event():
-    print("[SYSTEM] Starting up API worker...")
-    asyncio.create_task(api_worker())
+    print("[SYSTEM] Starting SINGLE API worker...")
+    # worker를 '딱 하나만' 만든다!
+    asyncio.create_task(single_worker())
 
-async def api_worker():
+async def single_worker():
     while True:
         task_id, task_type, req = await task_queue.get()
-        print(f"[WORKER] Handling task {task_id} type={task_type}, req={json.dumps(req, indent=2)}")
+        print(f"[WORKER] Handling task {task_id} ({task_type})")
         try:
             if task_type == 'remove-person':
-                print(f"[WORKER] --> Calling handle_remove_person")
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, utils.handle_remove_person, req)
             elif task_type == 'recommend-music':
-                print(f"[WORKER] --> Calling handle_recommend_music")
                 result = await utils.handle_recommend_music(req)
             elif task_type == 'scene-blend':
-                print(f"[WORKER] --> Calling handle_scene_blend")
                 result = await utils.handle_scene_blend(req)
             elif task_type == 'generate-dalle-image':
-                print(f"[WORKER] --> Calling handle_generate_dalle_image")
                 result = await utils.handle_generate_dalle_image(req)
             else:
-                result = {"success": False, "error": f"Unknown task type: {task_type}"}
+                result = {"success": False, "error": "Unknown task type"}
             task_results[task_id] = result
-            print(f"[WORKER] Task {task_id} completed. success={result.get('success')}")
+            print(f"[WORKER] Task {task_id} done. Success={result.get('success')}")
         except Exception as e:
-            print(f"[WORKER][ERROR] Exception for {task_id}: {e}")
+            print(f"[WORKER][ERROR] {e}")
             task_results[task_id] = {"success": False, "error": str(e)}
         finally:
             print(f"[WORKER] Queue task_done for {task_id}")
