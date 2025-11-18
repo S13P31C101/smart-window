@@ -28,13 +28,23 @@ async def startup_event():
 async def music_worker():
     while True:
         task_id, request = await music_queue.get()
-        print(f"[WORKER-MUSIC] Handling task {task_id} (recommend-music)")
+        print(f"[WORKER-MUSIC] Start process for task_id={task_id}")
+        print(f"[WORKER-MUSIC] Request: {json.dumps(request, indent=2)}")
         try:
+            print(f"[WORKER-MUSIC] Step 1 - Caption extraction")
+            # Step 1: Caption 추출 로그는 utils 내부에서 이미 print, 여기도 표시
             result = await utils.handle_recommend_music(request)
+            print(f"[WORKER-MUSIC] Step 2 - YouTube search, result: {result}")
+
+            # Step 3: 콜백 성공/실패 표시
+            if result.get("success"):
+                print(f"[WORKER-MUSIC] MUSIC COMPLETE: YouTube Found → {result.get('youtube_url')}")
+            else:
+                print(f"[WORKER-MUSIC][ERROR] MUSIC YOUTUBE FAIL or no match. Message: {result.get('message')}, error: {result.get('error')}")
             task_results[task_id] = result
             print(f"[WORKER-MUSIC] Task {task_id} done. Success={result.get('success')}")
         except Exception as e:
-            print(f"[WORKER-MUSIC][ERROR] {e}")
+            print(f"[WORKER-MUSIC][EXCEPTION] {task_id} Exception: {e}")
             task_results[task_id] = {"success": False, "error": str(e)}
         finally:
             print(f"[WORKER-MUSIC] Queue task_done for {task_id}")
@@ -47,17 +57,21 @@ async def main_worker():
         try:
             if task_type == 'remove-person':
                 loop = asyncio.get_event_loop()
+                print(f"[WORKER-MAIN] Start remove-person")
                 result = await loop.run_in_executor(None, utils.handle_remove_person, req)
             elif task_type == 'scene-blend':
+                print(f"[WORKER-MAIN] Start scene-blend")
                 result = await utils.handle_scene_blend(req)
             elif task_type == 'generate-dalle-image':
+                print(f"[WORKER-MAIN] Start generate-dalle-image")
                 result = await utils.handle_generate_dalle_image(req)
             else:
+                print(f"[WORKER-MAIN][ERROR] Unknown task type: {task_type}")
                 result = {"success": False, "error": "Unknown task type"}
             task_results[task_id] = result
             print(f"[WORKER-MAIN] Task {task_id} done. Success={result.get('success')}")
         except Exception as e:
-            print(f"[WORKER-MAIN][ERROR] {e}")
+            print(f"[WORKER-MAIN][ERROR] {task_id} Exception: {e}")
             task_results[task_id] = {"success": False, "error": str(e)}
         finally:
             print(f"[WORKER-MAIN] Queue task_done for {task_id}")
