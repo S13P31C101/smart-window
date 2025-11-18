@@ -1,201 +1,183 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from ultralytics import YOLO
-import numpy as np
-import cv2
 import os
-from PIL import Image
-import torch
-from diffusers import StableDiffusionInpaintPipeline
-import httpx
-import io
-import traceback
+import uuid
+import asyncio
+import json
+import time
+from fastapi import FastAPI, Body
+from fastapi.responses import JSONResponse, StreamingResponse
+from dotenv import load_dotenv
+import utils
+
+load_dotenv()
+SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+music_queue = asyncio.Queue()
+main_queue = asyncio.Queue()
+task_results = {}
 
 app = FastAPI()
 
-device_type = "cuda" if torch.cuda.is_available() else "cpu"
+@app.on_event("startup")
+async def startup_event():
+    print("[SYSTEM] Starting dedicated music and main workers...")
+    asyncio.create_task(music_worker())
+    asyncio.create_task(main_worker())
+    print("[SYSTEM] Both workers launched")
 
-# Stable Diffusion Inpaint pipeline GPU 로드
-pipe = StableDiffusionInpaintPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-2-inpainting",
-    torch_dtype=torch.float16 if device_type == "cuda" else torch.float32
-)
-pipe = pipe.to(device_type)
-
-# YOLO 모델 로드
-yolo_model = YOLO('yolov8n.pt')
-
-SAVE_DIR = "../results"
-os.makedirs(SAVE_DIR, exist_ok=True)
-
-
-
-def expand_box(box, image_shape, scale=0.1):
-    x1, y1, x2, y2 = box
-    w = x2 - x1
-    h = y2 - y1
-
-    x1_new = max(int(x1 - w * scale), 0)
-    y1_new = max(int(y1 - h * scale), 0)
-    x2_new = min(int(x2 + w * scale), image_shape[1] - 1)
-    y2_new = min(int(y2 + h * scale), image_shape[0] - 1)
-
-    return x1_new, y1_new, x2_new, y2_new
-
-
-def inpaint_image(image_np, mask_np):
+# --- 보조 함수 ---
+async def download_image_bytes(download_url):
+    print(f"[DOWNLOAD] >> download_image_bytes called ({download_url})")
     try:
-        input_height, input_width = image_np.shape[:2]
-        image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
-        mask_pil = Image.fromarray(mask_np).convert("L")
-
-        target_size = (512, 512)
-        image_pil_resized = image_pil.resize(target_size, Image.LANCZOS)
-        mask_pil_resized = mask_pil.resize(target_size, Image.NEAREST)
-
-        print("Starting inpainting...")
-        result = pipe(
-            prompt="natural outdoor landscape, seamless realistic background",
-            image=image_pil_resized,
-            mask_image=mask_pil_resized,
-            guidance_scale=7.5,
-            num_inference_steps=50
-        ).images[0]
-        print("Inpainting done")
-
-        result = result.resize((input_width, input_height), Image.LANCZOS)
-        return result
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(tb)
-        raise RuntimeError(f"Inpainting pipeline error: {str(e)}\n{tb}")
-
-
-async def download_image(url: str) -> np.ndarray:
-    timeout = httpx.Timeout(30.0, read=30.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.get(url)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to download image from downloadUrl")
-        image_np = np.frombuffer(resp.content, np.uint8)
-        image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
-        if image is None:
-            raise HTTPException(status_code=400, detail="Downloaded image is invalid or cannot be decoded")
-    return image
-
-
-async def request_ai_upload_url(target_s3_key: str) -> dict:
-    timeout = httpx.Timeout(30.0, read=30.0)
-    headers = {"X-AI-Token": AI_TOKEN}
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        try:
-            resp = await client.post(AI_UPLOAD_URL, json={"s3ObjectKey": target_s3_key}, headers=headers)
-            resp.raise_for_status()
-            response_json = resp.json()
-            # status 200 확인 및 data 반환
-            if response_json.get("status") == 200 and "data" in response_json:
-                return response_json["data"]
+        print("[DOWNLOAD] >> Creating AsyncClient")
+        async with utils.httpx.AsyncClient(timeout=30.0) as client:
+            print("[DOWNLOAD] >> before GET call")
+            try:
+                resp = await client.get(download_url)
+                print(f"[DOWNLOAD] >> after GET call, status={resp.status_code}")
+            except Exception as e:
+                print(f"[DOWNLOAD][EXCEPTION] in GET call: {e}")
+                raise
+            if resp.status_code == 200:
+                print(f"[DOWNLOAD] >> Success. Bytes={len(resp.content)}")
+                return resp.content
             else:
-                raise HTTPException(status_code=500, detail="Invalid response structure from AI upload URL")
-        except httpx.ConnectTimeout:
-            print("Connection timed out while requesting AI upload URL")
-            raise HTTPException(status_code=504, detail="Connection timeout to AI upload URL")
-        except httpx.HTTPStatusError as e:
-            print(f"HTTP error: {e.response.status_code}")
-            raise HTTPException(status_code=e.response.status_code, detail="HTTP error from AI upload URL")
-        except Exception as e:
-            print(f"Unexpected error: {str(e)}")
-            raise HTTPException(status_code=500, detail="Unexpected error from AI upload URL")
-
-
-async def upload_to_s3(file_url: str, image_buffer: io.BytesIO):
-    timeout = httpx.Timeout(60.0, read=60.0)
-    headers = {
-        "Content-Type": "image/png"
-    }
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.put(file_url, content=image_buffer.getvalue(), headers=headers)
-        if resp.status_code not in (200, 201):
-            raise HTTPException(status_code=resp.status_code, detail=f"S3 upload failed with status code {resp.status_code}")
-
-
-async def notify_ai_callback(media_id: int, target_s3_key: str):
-    timeout = httpx.Timeout(30.0, read=30.0)
-    headers = {"X-AI-Token": AI_TOKEN}
-    callback_payload = {
-        "parentMediaId": str(media_id),  # 반드시 str
-        "s3ObjectKey": target_s3_key,
-        "fileType": "IMAGE"
-    }
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(AI_CALLBACK_URL, json=callback_payload, headers=headers)
-        print(f"AI callback status: {resp.status_code}")
-        print(f"AI callback body: {resp.text}")
-
-        # 디버깅을 위해 상태코드와 응답 내용을 모두 반환
-        if resp.status_code != 201 and resp.status_code != 200 :
-            error_detail = f"status={resp.status_code}, response={resp.text}"
-            print(f"AI callback failed: {error_detail}")
-            raise HTTPException(status_code=resp.status_code, detail=f"AI callback to BE failed: {error_detail}")
-
-
-
-
-
-@app.post("/api/v1/media/remove-person/")
-async def remove_person_and_upload(request: dict):
-    media_id = request.get("mediaId")
-    download_url = request.get("downloadUrl")
-    target_s3_key = request.get("targetAIS3Key")
-
-    if not media_id or not download_url or not target_s3_key:
-        raise HTTPException(status_code=400, detail="mediaId, downloadUrl, and targetAIS3Key are required")
-
-    try:
-        # 1. 원본 이미지 다운로드
-        image = await download_image(download_url)
-
-        height, width = image.shape[:2]
-        mask = np.zeros((height, width), np.uint8)
-
-        # 2. YOLO로 사람 탐지 후 마스크 생성
-        results = yolo_model.predict(image)
-
-        for r in results:
-            for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
-                if int(cls) == 0:
-                    box_expanded = expand_box(box, image.shape, scale=0.1)
-                    x1, y1, x2, y2 = map(int, box_expanded)
-                    mask[y1:y2, x1:x2] = 255
-
-        # 3. 인페인팅
-        inpainted_image = inpaint_image(image, mask)
-
-        # 4. 메모리 버퍼에 PNG 저장
-        buffer = io.BytesIO()
-        inpainted_image.save(buffer, format="PNG")
-        buffer.seek(0)
-
-        # 5. BE에 AI 업로드 URL 요청
-        ai_upload_data = await request_ai_upload_url(target_s3_key)
-        if not ai_upload_data or ai_upload_data.get("s3ObjectKey") != target_s3_key:
-            raise HTTPException(status_code=500, detail="S3 object key mismatch or missing in AI upload URL response")
-
-        file_url = ai_upload_data.get("fileUrl")
-        if not file_url:
-            raise HTTPException(status_code=500, detail="fileUrl missing in AI upload URL response")
-
-        # 6. S3에 이미지 업로드
-        await upload_to_s3(file_url, buffer)
-
-        # 7. AI 콜백 전송
-        await notify_ai_callback(media_id, target_s3_key)
-
-        return JSONResponse(content={"success": True, "message": "Person removed and uploaded successfully"})
-
-    except HTTPException as he:
-        return JSONResponse(content={"success": False, "error": he.detail}, status_code=he.status_code)
+                print(f"[DOWNLOAD][ERROR] Download fail ({resp.status_code}) url={download_url}")
+                return None
     except Exception as e:
-        tb = traceback.format_exc()
-        print(tb)
-        return JSONResponse(content={"success": False, "error": f"{str(e)}\n{tb}"}, status_code=500)
+        print(f"[DOWNLOAD][ERROR] Exception (outer): {e}")
+        return None
+    finally:
+        print("[DOWNLOAD] >> Download function finished (finally block)")
+
+# --- worker들 ---
+
+async def music_worker():
+    print("[WORKER-MUSIC] >>> Worker started")
+    wake_count = 0
+    while True:
+        print(f"[WORKER-MUSIC] >>> Waiting for next music task... (queue size: {music_queue.qsize()})")
+        task_id, request = await music_queue.get()
+        wake_count += 1
+        print(f"[WORKER-MUSIC] >>> Got task {task_id} | wake_count={wake_count} | Time={time.strftime('%X')}")
+        try:
+            print(f"[WORKER-MUSIC] >>> Processing task_id={task_id}, request keys: {list(request.keys())}")
+            download_url = request.get("downloadUrl")
+            print(f"[WORKER-MUSIC] >>> Downloading image from: {download_url}")
+            # --- download diagnostic ---
+            image_bytes = await download_image_bytes(download_url)
+            if not image_bytes:
+                print(f"[WORKER-MUSIC][ERROR] Image download failed for task_id={task_id}")
+                task_results[task_id] = {"success": False, "error": "Image download failed (expired S3 link?)"}
+                music_queue.task_done()  # 반드시 호출!
+                continue
+            request['image_bytes'] = image_bytes
+            print(f"[WORKER-MUSIC] >>> Image download complete. Bytes: {len(image_bytes)}")
+            print(f"[WORKER-MUSIC] >>> Calling handle_recommend_music")
+            result = await utils.handle_recommend_music(request)
+            print(f"[WORKER-MUSIC] >>> handle_recommend_music finished. Result: {result}")
+            task_results[task_id] = result
+            if result.get("success"):
+                print(f"[WORKER-MUSIC] >>> MUSIC COMPLETE: YouTube Found → {result.get('youtube_url')}")
+            else:
+                print(f"[WORKER-MUSIC][ERROR] MUSIC FAIL/NO MATCH. msg:{result.get('message')}, err:{result.get('error')}")
+            print(f"[WORKER-MUSIC] >>> Done: task_id={task_id} Success={result.get('success')}")
+        except Exception as e:
+            print(f"[WORKER-MUSIC][EXCEPTION] {task_id} Exception: {e}")
+            task_results[task_id] = {"success": False, "error": str(e)}
+        finally:
+            print(f"[WORKER-MUSIC] >>> task_done for {task_id}, queue size now: {music_queue.qsize()}")
+            music_queue.task_done()
+
+async def main_worker():
+    print("[WORKER-MAIN] >>> Worker started")
+    wake_count = 0
+    while True:
+        print(f"[WORKER-MAIN] >>> Waiting for next main task... (queue size: {main_queue.qsize()})")
+        task_id, task_type, req = await main_queue.get()
+        wake_count += 1
+        print(f"[WORKER-MAIN] >>> Got task {task_id} ({task_type}) | wake_count={wake_count} | Time={time.strftime('%X')}")
+        try:
+            print(f"[WORKER-MAIN] >>> Processing task_id={task_id}, request keys: {list(req.keys())}")
+            if task_type == 'remove-person':
+                loop = asyncio.get_event_loop()
+                print(f"[WORKER-MAIN] >>> Start remove-person")
+                result = await loop.run_in_executor(None, utils.handle_remove_person, req)
+            elif task_type == 'scene-blend':
+                print(f"[WORKER-MAIN] >>> Start scene-blend")
+                result = await utils.handle_scene_blend(req)
+            elif task_type == 'generate-dalle-image':
+                print(f"[WORKER-MAIN] >>> Start generate-dalle-image")
+                result = await utils.handle_generate_dalle_image(req)
+            else:
+                print(f"[WORKER-MAIN][ERROR] Unknown task type: {task_type}")
+                result = {"success": False, "error": "Unknown task type"}
+            task_results[task_id] = result
+            print(f"[WORKER-MAIN] >>> Done: task_id={task_id}, Success={result.get('success')}")
+        except Exception as e:
+            print(f"[WORKER-MAIN][EXCEPTION] {task_id} Exception: {e}")
+            task_results[task_id] = {"success": False, "error": str(e)}
+        finally:
+            print(f"[WORKER-MAIN] >>> task_done for {task_id}, queue size now: {main_queue.qsize()}")
+            main_queue.task_done()
+
+# --- API ---
+
+@app.post("/api/v1/ai/remove-person")
+async def remove_person_and_upload(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] remove-person request (pre-download put): {json.dumps(request, indent=2)}")
+    download_url = request.get("downloadUrl")
+    image_bytes = await download_image_bytes(download_url)
+    if not image_bytes:
+        print("[QUEUE INPUT][ERROR] Image download failed for remove-person")
+        return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
+    request['image_bytes'] = image_bytes
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to main_queue (remove-person) task_id={task_id}")
+    await main_queue.put((task_id, "remove-person", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.post("/api/v1/ai/recommend-music")
+async def recommend_music(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] recommend-music request (pre-download put): {json.dumps(request, indent=2)}")
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to music_queue (recommend-music) task_id={task_id}")
+    await music_queue.put((task_id, request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.post("/api/v1/ai/scene-blend")
+async def scene_blend(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] scene-blend request (pre-download put): {json.dumps(request, indent=2)}")
+    download_url = request.get("downloadUrl")
+    image_bytes = await download_image_bytes(download_url)
+    if not image_bytes:
+        print("[QUEUE INPUT][ERROR] Image download failed for scene-blend")
+        return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
+    request['image_bytes'] = image_bytes
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to main_queue (scene-blend) task_id={task_id}")
+    await main_queue.put((task_id, "scene-blend", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.post("/api/v1/ai/generate-dalle-image")
+async def generate_dalle_image_api(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] generate-dalle-image request: {json.dumps(request, indent=2)}")
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to main_queue (generate-dalle-image) task_id={task_id}")
+    await main_queue.put((task_id, "generate-dalle-image", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.get("/api/v1/ai/result")
+async def get_task_result(task_id: str):
+    print(f"[API] get_task_result called for {task_id}")
+    if task_id not in task_results:
+        print(f"[API][ERROR] {task_id} not found")
+        return JSONResponse(content={"success": False, "error": "Result not ready or invalid task_id"}, status_code=404)
+    result = task_results[task_id]
+    if isinstance(result, dict) and result.get("stream"):
+        resp = result["stream"]
+        print(f"[API] StreamingResponse for {task_id}")
+        return StreamingResponse(resp, media_type=result["media_type"])
+    else:
+        print(f"[API] JSONResponse for {task_id}, success={result.get('success')}")
+        return JSONResponse(content=result)
