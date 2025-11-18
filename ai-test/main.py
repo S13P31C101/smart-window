@@ -27,7 +27,6 @@ async def single_worker():
         task_id, task_type, req = await task_queue.get()
         print(f"[WORKER] Handling task {task_id} ({task_type})")
         try:
-            # 이제 queue에 들어가는 req 내부에 image_bytes/이미지 np.ndarray 등이 반드시 포함됨!
             if task_type == 'remove-person':
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, utils.handle_remove_person, req)
@@ -70,7 +69,6 @@ async def remove_person_and_upload(request: dict = Body(...)):
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
         return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
-    # 원본 요청 dict에 image_bytes 키로 바이너리 저장!
     request['image_bytes'] = image_bytes
     task_id = str(uuid.uuid4())
     await task_queue.put((task_id, "remove-person", request))
