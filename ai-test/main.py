@@ -11,26 +11,43 @@ load_dotenv()
 SAVE_DIR = os.getenv("SAVE_DIR", "/app/results")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-task_queue = asyncio.Queue()
+music_queue = asyncio.Queue()
+main_queue = asyncio.Queue()
 task_results = {}
 
 app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
-    print("[SYSTEM] Starting SINGLE API worker...")
-    asyncio.create_task(single_worker())
+    print("[SYSTEM] Starting dedicated music and main workers...")
+    asyncio.create_task(music_worker())
+    asyncio.create_task(main_worker())
 
-async def single_worker():
+# ------------ 워커 정의 --------------
+
+async def music_worker():
     while True:
-        task_id, task_type, req = await task_queue.get()
-        print(f"[WORKER] Handling task {task_id} ({task_type})")
+        task_id, request = await music_queue.get()
+        print(f"[WORKER-MUSIC] Handling task {task_id} (recommend-music)")
+        try:
+            result = await utils.handle_recommend_music(request)
+            task_results[task_id] = result
+            print(f"[WORKER-MUSIC] Task {task_id} done. Success={result.get('success')}")
+        except Exception as e:
+            print(f"[WORKER-MUSIC][ERROR] {e}")
+            task_results[task_id] = {"success": False, "error": str(e)}
+        finally:
+            print(f"[WORKER-MUSIC] Queue task_done for {task_id}")
+            music_queue.task_done()
+
+async def main_worker():
+    while True:
+        task_id, task_type, req = await main_queue.get()
+        print(f"[WORKER-MAIN] Handling task {task_id} ({task_type})")
         try:
             if task_type == 'remove-person':
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, utils.handle_remove_person, req)
-            elif task_type == 'recommend-music':
-                result = await utils.handle_recommend_music(req)
             elif task_type == 'scene-blend':
                 result = await utils.handle_scene_blend(req)
             elif task_type == 'generate-dalle-image':
@@ -38,13 +55,15 @@ async def single_worker():
             else:
                 result = {"success": False, "error": "Unknown task type"}
             task_results[task_id] = result
-            print(f"[WORKER] Task {task_id} done. Success={result.get('success')}")
+            print(f"[WORKER-MAIN] Task {task_id} done. Success={result.get('success')}")
         except Exception as e:
-            print(f"[WORKER][ERROR] {e}")
+            print(f"[WORKER-MAIN][ERROR] {e}")
             task_results[task_id] = {"success": False, "error": str(e)}
         finally:
-            print(f"[WORKER] Queue task_done for {task_id}")
-            task_queue.task_done()
+            print(f"[WORKER-MAIN] Queue task_done for {task_id}")
+            main_queue.task_done()
+
+# ---------- 보조 함수 -------------
 
 async def download_image_bytes(download_url):
     try:
@@ -60,6 +79,8 @@ async def download_image_bytes(download_url):
         print(f"[DOWNLOAD][ERROR] Exception: {e}")
         return None
 
+# ---------- API 엔드포인트 --------------
+
 @app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
     print("[QUEUE INPUT] remove-person request =", json.dumps(request, indent=2))
@@ -69,9 +90,8 @@ async def remove_person_and_upload(request: dict = Body(...)):
         return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
     request['image_bytes'] = image_bytes
     task_id = str(uuid.uuid4())
-    await task_queue.put((task_id, "remove-person", request))
+    await main_queue.put((task_id, "remove-person", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
-
 
 @app.post("/api/v1/ai/recommend-music")
 async def recommend_music(request: dict = Body(...)):
@@ -82,9 +102,8 @@ async def recommend_music(request: dict = Body(...)):
         return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
     request['image_bytes'] = image_bytes
     task_id = str(uuid.uuid4())
-    await task_queue.put((task_id, "recommend-music", request))
+    await music_queue.put((task_id, request))
     return JSONResponse(content={"success": True, "task_id": task_id})
-
 
 @app.post("/api/v1/ai/scene-blend")
 async def scene_blend(request: dict = Body(...)):
@@ -95,14 +114,14 @@ async def scene_blend(request: dict = Body(...)):
         return JSONResponse(content={"success": False, "error": "Image download failed (expired S3 link?)"}, status_code=400)
     request['image_bytes'] = image_bytes
     task_id = str(uuid.uuid4())
-    await task_queue.put((task_id, "scene-blend", request))
+    await main_queue.put((task_id, "scene-blend", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/generate-dalle-image")
 async def generate_dalle_image_api(request: dict = Body(...)):
     print("[QUEUE INPUT] generate-dalle-image request =", json.dumps(request, indent=2))
     task_id = str(uuid.uuid4())
-    await task_queue.put((task_id, "generate-dalle-image", request))
+    await main_queue.put((task_id, "generate-dalle-image", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.get("/api/v1/ai/result")
