@@ -5,9 +5,10 @@ import com.lumiscape.smartwindow.auth.dto.TokenReissueRequest;
 import com.lumiscape.smartwindow.auth.dto.TokenResponse;
 import com.lumiscape.smartwindow.auth.repository.RefreshTokenRepository;
 import com.lumiscape.smartwindow.config.jwt.JwtTokenProvider;
-import com.lumiscape.smartwindow.fcm.repository.FcmRepository;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
+import com.lumiscape.smartwindow.mobile.repository.MobileRepository;
+import com.lumiscape.smartwindow.mobile.service.MobileService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +28,12 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-    private final FcmRepository fcmRepository;
+    private final MobileRepository mobileRepository;
 
     @Transactional
     public void logout(Long userId) {
         refreshTokenRepository.deleteById(userId);
-        fcmRepository.deleteByUser_Id(userId);
+        mobileRepository.deleteAllByUser_Id(userId);
     }
 
     @Transactional

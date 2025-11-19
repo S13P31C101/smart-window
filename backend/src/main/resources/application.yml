@@ -2,8 +2,8 @@
 # 공통 설정 (모든 프로필에 적용)
 # ===============================================
 spring:
-  config:
-    import: optional:file:.env[.properties] # <-- 잠시 주석 처리
+  #config:
+  #  import: optional:file:.env[.properties] # <-- 잠시 주석 처리
   # 'dev' 프로필을 명시적으로 활성화하고, 'oauth' 프로필을 항상 포함합니다.
   profiles:
     default: dev
@@ -22,11 +22,11 @@ server:
   port: 8080 # 우리 서버가 실행될 포트
   forward-headers-strategy: framework
 
-# App-specific properties
+# AI
 app:
   ai:
-    server-url: ${AI_SERVER_URL:http://localhost:5000} # AI 서버 주소
-    secret: ${AI_CALLBACK_SECRET} # AI 서버 콜백 시크릿
+    server-url: ${AI_SERVER_URL}
+    secret: ${AI_CALLBACK_SECRET}
 
 # S3 설정
 cloud:
@@ -47,11 +47,6 @@ mqtt:
     id: ${MQTT_CLIENT_ID}
   username: ${MQTT_USER}
   password: ${MQTT_PASSWORD}
-
-# JWT (JSON Web Token) 설정
-jwt:
-  secret: ${JWT_SECRET} # TODO: 외부 환경변수에서 가져올 JWT 비밀키
-  expiration: 1296000000 # 토큰 만료 시간
 
 # Swagger (API 문서 자동화) 설정
 springdoc:

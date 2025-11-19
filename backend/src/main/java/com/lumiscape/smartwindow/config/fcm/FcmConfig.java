@@ -11,51 +11,49 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Configuration
 public class FcmConfig {
 
-    @Value("${fcm.key.path}")
+//    @Value("${fcm.key.path}")
+    @Value("${fcm.key.content}")
     private String fcmKeyPath;
 
     private FirebaseApp firebaseApp;
 
-    @PostConstruct
-    public void initialize() {
-        try {
-            ClassPathResource resource = new ClassPathResource(fcmKeyPath);
+    @Bean
+    public FirebaseApp firebaseApp() throws Exception {
+//        ClassPathResource resource = new ClassPathResource(fcmKeyPath);
+//
+//        if (!resource.exists()) {
+//            throw new IOException("Can't Find Key" + fcmKeyPath);
+//        }
 
-            if (!resource.exists()) {
-                log.error("Firebase service account key file not found at path: {}", fcmKeyPath);
-                return;
-            }
+//        InputStream serviceAccount = resource.getInputStream();
 
-            InputStream serviceAccount = resource.getInputStream();
+        InputStream serviceAccount = new ByteArrayInputStream(fcmKeyPath.getBytes(StandardCharsets.UTF_8));
 
-            FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
+        FirebaseOptions options = FirebaseOptions.builder()
+                .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                .build();
 
-            if (FirebaseApp.getApps().isEmpty()) {
-                this.firebaseApp = FirebaseApp.initializeApp(options);
-                log.info("FirebaseApp initialization complete.");
-            } else {
-                this.firebaseApp = FirebaseApp.getInstance();
-                log.info("FirebaseApp already initialized.");
-            }
-        } catch (Exception e) {
-            log.error("Error initializing Firebase Admin SDK", e);
+        if (FirebaseApp.getApps().isEmpty()) {
+            log.info("FirebaseApp initialization complete.");
+            return FirebaseApp.initializeApp(options);
+        } else {
+            log.info("FirebaseApp already initialized.");
+            return FirebaseApp.getInstance();
         }
     }
 
     @Bean
-    public FirebaseMessaging firebaseMessaging() {
-        if (this.firebaseApp == null) {
-            log.error("FirebaseApp has not been initialized. FirebaseMessaging bean cannot be created.");
-            throw new IllegalStateException("FirebaseApp has not been initialized");
-        }
-        return FirebaseMessaging.getInstance(this.firebaseApp);
+    public FirebaseMessaging firebaseMessaging(FirebaseApp firebaseApp) {
+
+        return FirebaseMessaging.getInstance(firebaseApp);
     }
 }

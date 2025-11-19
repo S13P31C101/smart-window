@@ -1,9 +1,9 @@
 package com.lumiscape.smartwindow.mobile.service;
 
-import com.lumiscape.smartwindow.fcm.domain.FcmToken;
-import com.lumiscape.smartwindow.fcm.repository.FcmTokenRepository;
+import com.lumiscape.smartwindow.mobile.domain.Mobile;
+import com.lumiscape.smartwindow.mobile.repository.MobileRepository;
 import com.lumiscape.smartwindow.user.domain.entity.User;
-import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
+import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,22 +13,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class MobileService {
 
-    private final UserRepository userRepository;
-    private final FcmTokenRepository fcmTokenRepository;
+    private final MobileRepository mobileRepository;
+    private final UserService userService;
 
-    public void registerFcmToken(String userEmail, String token) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userEmail));
+    public void registerFcmToken(Long userId, String token) {
+        User user = userService.getUserReference(userId);
 
-        fcmTokenRepository.findByUser(user).ifPresentOrElse(
-                fcmToken -> {
-                    // 이미 토큰이 있으면 값만 업데이트
-                    fcmToken.updateToken(token);
-                },
-                () -> {
-                    // 토큰이 없으면 새로 생성하여 저장
-                    fcmTokenRepository.save(new FcmToken(user, token));
-                }
-        );
+        Mobile mobile = Mobile.builder()
+                        .token(token)
+                        .user(user)
+                        .build();
+
+        mobileRepository.save(mobile);
     }
 }

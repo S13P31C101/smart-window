@@ -26,6 +26,7 @@ public enum ErrorCode {
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-03", "이미지를 찾을 수 없습니다."),
     MUSIC_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-04", "음악을 찾을 수 없습니다."),
     ALARM_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-05", "알람을 찾을 수 없습니다."),
+    MOBILE_NOT_FOUND(HttpStatus.NOT_FOUND, "E-404-06", "모바일 기기를 찾을 수 없습니다."),
 
     // 409 Conflict
     DEVICE_ALREADY_EXISTS(HttpStatus.CONFLICT, "E-409-01", "이미 등록된 디바이스입니다."),
