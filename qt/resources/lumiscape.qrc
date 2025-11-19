@@ -69,5 +69,8 @@
         <file>../assets/images/scenes/island/daytime_island.png</file>
         <file>../assets/images/scenes/island/evening_island.png</file>
         <file>../assets/images/scenes/island/night_island.png</file>
+        
+        <!-- Scene Videos -->
+        <file>../assets/videos/scenes/uyuni/daytime_uyuni.mp4</file>
     </qresource>
 </RCC>
