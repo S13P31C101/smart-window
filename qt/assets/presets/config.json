@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "screenWidth": 1920,
+  "screenHeight": 1080,
+  "theme": "dark",
+  "gestureEnabled": true,
+
+  "deviceUniqueId": "",
+
+  "mqtt": {
+    "host": "",
+    "port": 1234,
+    "username": "",
+    "password": "",
+    "clientId": "",
+    "useTls": true
+  },
+
+  "apis": {
+    "weather": {
+      "apiKey": "",
+      "apiUrl": "https://api.openweathermap.org/geo/1.0/direct",
+      "defaultCity": "Gwangju",
+      "updateIntervalMinutes": 10
+    }
+  },
+
+  "mediapipe": {
+    "cameraId": 0,
+    "minDetectionConfidence": 0.7,
+    "minTrackingConfidence": 0.5
+  },
+
+  "widgets": {
+    "clock": {
+      "enabled": true,
+      "format24Hour": false,
+      "showSeconds": true
+    },
+    "weather": {
+      "enabled": true,
+      "autoUpdate": true
+    },
+    "spotify": {
+      "enabled": true,
+      "autoPlay": false
+    },
+    "quote": {
+      "enabled": true,
+      "changeIntervalSeconds": 30
+    }
+  },
+
+  "modes": {
+    "default": "menu",
+    "custom": {
+      "allowDrag": true,
+      "snapToGrid": false
+    },
+    "glass": {
+      "transparency": 0.9,
+      "blur": 40
+    },
+    "privacy": {
+      "hideAllContent": true
+    },
+    "auto": {
+      "weatherBasedRecommendations": true,
+      "timeBasedRecommendations": true
+    }
+  },
+
+  "backgroundMusic": {
+    "glass": "https://www.youtube.com/watch?v=FCdKgHco1_4",
+    "auto": {
+      "mapleworld": "https://www.youtube.com/watch?v=-FMHYjqC4iA",
+      "paris": "https://www.youtube.com/watch?v=831FwSx3pB0",
+      "uyuni": "https://www.youtube.com/watch?v=mQLJzQnfC0A&t=1242s",
+      "island": "https://www.youtube.com/watch?v=RjTPKlKPM3Y"
+    }
+  }
+}

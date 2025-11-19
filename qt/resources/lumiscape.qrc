@@ -1,0 +1,76 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- QML Files -->
+        <file>../qml/Main.qml</file>
+
+        <!-- Screens -->
+        <file>../qml/screens/LoadingScreen.qml</file>
+        <file>../qml/screens/MenuScreen.qml</file>
+        <file>../qml/screens/CustomModeScreen.qml</file>
+        <file>../qml/screens/GlassModeScreen.qml</file>
+        <file>../qml/screens/PrivacyModeScreen.qml</file>
+        <file>../qml/screens/AutoModeScreen.qml</file>
+        <file>../qml/screens/StandbyScreen.qml</file>
+
+        <!-- Components -->
+        <file>../qml/components/GestureCursor.qml</file>
+        <file>../qml/components/GestureControlledUI.qml</file>
+        <file>../qml/components/RadialMenu.qml</file>
+        <file>../qml/components/AmbientGlow.qml</file>
+        <file>../qml/components/GlassCard.qml</file>
+        <file>../qml/components/MinimalButton.qml</file>
+
+        <!-- Widgets -->
+        <file>../qml/widgets/ClockWidget.qml</file>
+        <file>../qml/widgets/WeatherWidget.qml</file>
+        <file>../qml/widgets/SpotifyWidget.qml</file>
+        <file>../qml/widgets/QuoteWidget.qml</file>
+
+        <!-- Styles -->
+        <file>../qml/styles/Theme.qml</file>
+        <file>../qml/styles/Effects.qml</file>
+        <file>../qml/styles/qmldir</file>
+
+        <!-- Assets -->
+        <file>../assets/presets/config.json</file>
+        <file>../assets/presets/widgets.json</file>
+        <file>../assets/presets/auto_scenes.json</file>
+
+        <!-- Logos and Icons -->
+        <file>../assets/fonts/Youtube_logo.png</file>
+
+        <!-- Scene Images -->
+        <file>../assets/images/scenes/default.png</file>
+
+        <!-- Mapleworld Scene Images -->
+        <file>../assets/images/scenes/mapleworld/dawn_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/morning_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/daytime_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/evening_maple.png</file>
+        <file>../assets/images/scenes/mapleworld/night_maple.png</file>
+
+        <!-- Paris Scene Images -->
+        <file>../assets/images/scenes/paris/dawn_paris.png</file>
+        <file>../assets/images/scenes/paris/morning_paris.png</file>
+        <file>../assets/images/scenes/paris/daytime_paris.png</file>
+        <file>../assets/images/scenes/paris/evening_paris.png</file>
+        <file>../assets/images/scenes/paris/night_paris.png</file>
+
+        <!-- Uyuni Scene Images -->
+        <file>../assets/images/scenes/uyuni/dawn_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/morning_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/daytime_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/evening_uyuni.png</file>
+        <file>../assets/images/scenes/uyuni/night_uyuni.png</file>
+
+        <!-- Island Scene Images -->
+        <file>../assets/images/scenes/island/dawn_island.png</file>
+        <file>../assets/images/scenes/island/morning_island.png</file>
+        <file>../assets/images/scenes/island/daytime_island.png</file>
+        <file>../assets/images/scenes/island/evening_island.png</file>
+        <file>../assets/images/scenes/island/night_island.png</file>
+        
+        <!-- Scene Videos -->
+        <file>../assets/videos/scenes/uyuni/daytime_uyuni.mp4</file>
+    </qresource>
+</RCC>

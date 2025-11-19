@@ -1,2 +1,0 @@
-# smart-window
-Lumiscape
