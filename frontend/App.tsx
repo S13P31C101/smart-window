@@ -1,13 +1,15 @@
 import React, { useEffect } from 'react';
+import { StyleSheet } from 'react-native'; // Import StyleSheet
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import RootNavigator from '@/navigation/RootNavigator';
 import queryClient from '@/api/queryClient';
-import './src/services/fcmService';
+// './src/services/fcmService'를 직접 실행하는 대신, fcmService 인스턴스를 가져옵니다.
+import fcmService from './src/services/fcmService';
 import { useAuthStore } from '@/stores/authStore';
 
-function App(): React.JSX.Element {
+function App() {
   // 테스트를 위해 주기적으로 토큰을 콘솔에 출력하는 로직
   useEffect(() => {
     // 2분(120000ms)마다 실행되는 인터벌 설정
@@ -28,8 +30,17 @@ function App(): React.JSX.Element {
     return () => clearInterval(intervalId);
   }, []); // 빈 배열을 전달하여 앱이 처음 마운트될 때 한 번만 실행되도록 합니다.
 
+  // FCM 초기화를 위해 이 useEffect를 반드시 추가해야 합니다.
+  useEffect(() => {
+    const initializeApp = async () => {
+      await fcmService.init();
+    };
+
+    initializeApp();
+  }, []);
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView>
       <QueryClientProvider client={queryClient}>
         <NavigationContainer>
           <RootNavigator />
@@ -38,5 +49,12 @@ function App(): React.JSX.Element {
     </GestureHandlerRootView>
   );
 }
+
+// Define styles outside the component
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
 
 export default App;

@@ -6,6 +6,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '@/navigation/AuthNavigator';
 import { COLORS } from '@/constants/color';
 import { useFocusEffect } from '@react-navigation/native';
+import fcmService from '@/services/fcmService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 👇 1. 안드로이드 크롬 브라우저의 일반적인 User Agent 문자열을 정의합니다.
 const ANDROID_USER_AGENT = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36";
@@ -50,7 +52,7 @@ function SocialLoginScreen({ route }: Props) {
     }, [initialUrl])
   );
   
-  const handleMessage = (event: any) => {
+  const handleMessage = async (event: any) => {
     try {
       // 👇 [로그 추가] 백엔드로부터 받은 최종 메시지(JSON)를 확인합니다.
       console.log('[SocialLoginScreen] WebView로부터 메시지 수신:', event.nativeEvent.data);
@@ -60,6 +62,15 @@ function SocialLoginScreen({ route }: Props) {
       if (accessToken && refreshToken) {
         console.log('[SocialLoginScreen] 토큰 파싱 성공! accessToken:', accessToken);
         setTokens({ accessToken, refreshToken });
+
+        // 👇 [가장 중요] 로그인 성공 후 FCM 토큰을 서버로 전송하는 로직을 다시 추가해주세요.
+        const fcmToken = await AsyncStorage.getItem('fcmToken');
+        if (fcmToken) {
+          console.log('[SocialLoginScreen] 저장된 FCM 토큰을 서버로 전송합니다:', fcmToken);
+          await fcmService.sendTokenToServer(fcmToken);
+        } else {
+          console.warn('[SocialLoginScreen] AsyncStorage에 저장된 FCM 토큰이 없습니다.');
+        }
       } else {
         console.error('[SocialLoginScreen] 응답 데이터에 토큰이 없습니다:', response);
       }
