@@ -1,0 +1,7 @@
+# MediaPipe Gesture Recognition Requirements
+opencv-python>=4.8.0
+mediapipe>=0.10.0
+numpy>=1.24.0
+
+# YouTube Audio Streaming Requirements
+yt-dlp>=2023.10.13
