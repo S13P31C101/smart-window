@@ -189,7 +189,14 @@ ApplicationWindow {
     Connections {
         target: router
         function onScreenChanged(screen, params) {
-            // Screen navigation handled
+            // Stop music when navigating away from music-enabled modes
+            var musicModes = ["custom", "glass", "auto"]
+            var isMusicMode = musicModes.indexOf(screen) !== -1
+
+            if (!isMusicMode && youtubeProvider.isPlaying) {
+                console.log("Main: Navigating to non-music mode '" + screen + "', stopping music")
+                youtubeProvider.stop()
+            }
         }
     }
 
