@@ -67,6 +67,9 @@ Item {
         }
     }
 
+    // Note: Music stopping is now handled by YouTubeAudioWidget's onVisibleChanged
+    // No need for manual stop() calls here - the widget handles it automatically
+
     // ====== 위젯 토글 버튼 (우측 중앙) - Gesture controlled ======
     GestureControlledUI {
         anchors.right: root.right

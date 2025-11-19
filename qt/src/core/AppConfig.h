@@ -28,6 +28,7 @@ class AppConfig : public QObject
     Q_PROPERTY(QString applicationDirPath READ applicationDirPath CONSTANT)
     Q_PROPERTY(QString currentMediaUrl READ currentMediaUrl WRITE setCurrentMediaUrl NOTIFY currentMediaUrlChanged)
     Q_PROPERTY(QString currentYoutubeUrl READ currentYoutubeUrl WRITE setCurrentYoutubeUrl NOTIFY currentYoutubeUrlChanged)
+    Q_PROPERTY(QString customModeYoutubeUrl READ customModeYoutubeUrl WRITE setCustomModeYoutubeUrl NOTIFY customModeYoutubeUrlChanged)
     Q_PROPERTY(QString glassModeBackgroundMusic READ glassModeBackgroundMusic NOTIFY configChanged)
     Q_PROPERTY(QVariantMap autoModeBackgroundMusic READ autoModeBackgroundMusic NOTIFY configChanged)
 
@@ -84,6 +85,7 @@ public:
 
     QString currentMediaUrl() const { return m_currentMediaUrl; }
     QString currentYoutubeUrl() const { return m_currentYoutubeUrl; }
+    QString customModeYoutubeUrl() const { return m_customModeYoutubeUrl; }
 
     QString glassModeBackgroundMusic() const { return m_glassModeBackgroundMusic; }
     QVariantMap autoModeBackgroundMusic() const { return m_autoModeBackgroundMusic; }
@@ -98,6 +100,7 @@ public:
     void setGestureEnabled(bool enabled);
     void setCurrentMediaUrl(const QString &url);
     void setCurrentYoutubeUrl(const QString &url);
+    void setCustomModeYoutubeUrl(const QString &url);
     void setWidgetClock(bool enabled);
     void setWidgetWeather(bool enabled);
     void setWidgetQuotes(bool enabled);
@@ -108,6 +111,7 @@ signals:
     void gestureEnabledChanged();
     void currentMediaUrlChanged();
     void currentYoutubeUrlChanged();
+    void customModeYoutubeUrlChanged();
     void widgetClockChanged();
     void widgetWeatherChanged();
     void widgetQuotesChanged();
@@ -150,6 +154,7 @@ private:
     // Media
     QString m_currentMediaUrl;
     QString m_currentYoutubeUrl;
+    QString m_customModeYoutubeUrl;
 
     // Background Music
     QString m_glassModeBackgroundMusic;

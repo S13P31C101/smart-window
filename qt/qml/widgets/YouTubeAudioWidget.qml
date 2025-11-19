@@ -249,7 +249,13 @@ Item {
     onYoutubeUrlChanged: {
         if (youtubeUrl && youtubeUrl.length > 0) {
             console.log("YouTubeAudioWidget: Loading URL:", youtubeUrl)
-            youtubeProvider.playYouTubeUrl(youtubeUrl)
+            try {
+                youtubeProvider.playYouTubeUrl(youtubeUrl)
+            } catch (error) {
+                console.error("YouTubeAudioWidget: Failed to load URL:", youtubeUrl, "Error:", error)
+            }
+        } else if (youtubeUrl === "") {
+            console.log("YouTubeAudioWidget: URL cleared, widget will hide")
         }
     }
 
@@ -286,11 +292,10 @@ Item {
         }
     }
 
-    // Stop playback when widget is destroyed (mode change)
-    Component.onDestruction: {
-        console.log("YouTubeAudioWidget: Stopping playback on destruction")
-        youtubeProvider.stop()
-    }
+    // Note: Stop() calls removed to prevent conflicts during screen transitions
+    // When a new URL is loaded via playYouTubeUrl(), the previous playback
+    // is automatically stopped and replaced by YouTubeProvider
+    // This prevents race conditions with Loader destroying/creating screens
 
     // Error display (small indicator in corner)
     Rectangle {

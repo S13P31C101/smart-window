@@ -7,15 +7,15 @@ import "../styles"
 Item {
     id: root
 
-    // Current YouTube URL state - synced with AppConfig
-    property string currentYoutubeUrl: appConfig.currentYoutubeUrl
+    // Custom Mode YouTube URL state - synced with AppConfig
+    property string customModeYoutubeUrl: appConfig.customModeYoutubeUrl
 
     // Watch for changes from AppConfig
     Connections {
         target: appConfig
-        function onCurrentYoutubeUrlChanged() {
-            root.currentYoutubeUrl = appConfig.currentYoutubeUrl
-            console.log("YouTube URL updated from MQTT:", appConfig.currentYoutubeUrl)
+        function onCustomModeYoutubeUrlChanged() {
+            root.customModeYoutubeUrl = appConfig.customModeYoutubeUrl
+            console.log("Custom Mode YouTube URL updated from MQTT:", appConfig.customModeYoutubeUrl)
         }
     }
 
@@ -92,11 +92,11 @@ Item {
     Item {
         id: guideScreen
         anchors.fill: parent
-        // Show guide initially, then hide after timer or when media/YouTube URL is provided
+        // Show guide initially, then hide after timer or when media/music is provided
         property bool manuallyHidden: false
         visible: !manuallyHidden &&
                  (!appConfig.currentMediaUrl || appConfig.currentMediaUrl === "") &&
-                 (!appConfig.currentYoutubeUrl || appConfig.currentYoutubeUrl === "")
+                 (!root.customModeYoutubeUrl || root.customModeYoutubeUrl === "")
         z: 100  // Ensure guide screen is on top when visible
 
         // 10-second auto-hide timer
@@ -116,18 +116,18 @@ Item {
             target: appConfig
             function onCurrentMediaUrlChanged() {
                 var hasMedia = appConfig.currentMediaUrl && appConfig.currentMediaUrl !== ""
-                console.log("Media URL changed:", appConfig.currentMediaUrl, "-> Guide visible:", !hasMedia && !appConfig.currentYoutubeUrl)
+                console.log("Media URL changed:", appConfig.currentMediaUrl, "-> Guide visible:", !hasMedia && !root.customModeYoutubeUrl)
             }
-            function onCurrentYoutubeUrlChanged() {
-                var hasYoutube = appConfig.currentYoutubeUrl && appConfig.currentYoutubeUrl !== ""
-                console.log("YouTube URL changed:", appConfig.currentYoutubeUrl, "-> Guide visible:", !hasYoutube && !appConfig.currentMediaUrl)
+            function onCustomModeYoutubeUrlChanged() {
+                var hasYoutube = root.customModeYoutubeUrl && root.customModeYoutubeUrl !== ""
+                console.log("Custom Mode YouTube URL changed:", root.customModeYoutubeUrl, "-> Guide visible:", !hasYoutube && !appConfig.currentMediaUrl)
             }
         }
 
         Component.onCompleted: {
             console.log("Guide screen initialized.")
             console.log("  currentMediaUrl:", appConfig.currentMediaUrl)
-            console.log("  currentYoutubeUrl:", appConfig.currentYoutubeUrl)
+            console.log("  customModeYoutubeUrl:", root.customModeYoutubeUrl)
             console.log("  Guide visible:", guideScreen.visible)
 
             // Start 10-second timer if in initial state (no media/music)
@@ -340,7 +340,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: parent.height * 0.12
-        spacing: 20
+        spacing: root.height * 0.035
         z: 50  // Above background, below guide screen
 
         // 시계 위젯 - MQTT 제어
@@ -375,12 +375,12 @@ Item {
         anchors.bottomMargin: parent.height * 0.05
         width: Math.min(parent.width * 0.55, 700)
         height: 200
-        youtubeUrl: root.currentYoutubeUrl
-        visible: appConfig.widgetMusic && root.currentYoutubeUrl !== ""
+        youtubeUrl: root.customModeYoutubeUrl
+        visible: appConfig.widgetMusic && root.customModeYoutubeUrl !== "" && root.customModeYoutubeUrl.length > 0
         z: 60
 
         onPlayerReady: {
-            console.log("YouTube audio player ready in Custom Mode")
+            console.log("Custom Mode: YouTube audio player ready, URL:", root.customModeYoutubeUrl)
         }
     }
 

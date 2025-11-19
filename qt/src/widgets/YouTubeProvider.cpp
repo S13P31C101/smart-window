@@ -229,6 +229,14 @@ void YouTubeProvider::playYouTubeUrl(const QString &url)
         return;
     }
 
+    // Stop current playback before loading new URL
+    // This ensures clean transition between different modes
+    if (m_mediaPlayer->playbackState() == QMediaPlayer::PlayingState ||
+        m_mediaPlayer->playbackState() == QMediaPlayer::PausedState) {
+        qInfo() << "Stopping current playback before loading new URL";
+        m_mediaPlayer->stop();
+    }
+
     m_currentUrl = url;
     emit currentUrlChanged();
 
