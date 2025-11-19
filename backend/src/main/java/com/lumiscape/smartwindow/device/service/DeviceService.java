@@ -237,15 +237,29 @@ public class DeviceService {
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
                 // TODO FCM
-//                fcmNotificationService.sendNotificationToUser();
+                fcmNotificationService.sendNotification(device.getUser().getId(),
+                        "전원",
+                        device.getDeviceName() + (power ? " 의 전원이 켜졌습니다." : " 의 전원이 꺼졌습니다."));
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
                 device.updateOpen(open);
                 // TODO FCM
+                fcmNotificationService.sendNotification(device.getUser().getId(),
+                        "개폐",
+                        device.getDeviceName() + (open ? " 이 열렸습니다." : " 이 닫혔습니다."));
                 break;
+            case "mode":
+                DeviceMode mode = DeviceMode.valueOf(payload);
+                device.updateMode(mode);
+                fcmNotificationService.sendNotification(device.getUser().getId(),
+                        "모드",
+                        device.getDeviceName() + " 가 " + mode + " 입니다.");
             case "sensor":
                 // TODO FCM
+                fcmNotificationService.sendNotification(device.getUser().getId(),
+                        "센서",
+                        payload);
                 break;
         }
     }
