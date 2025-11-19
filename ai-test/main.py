@@ -134,7 +134,7 @@ async def process_main_request(task_type, req):
 
 # --- API ---
 
-@app.post("/api/v1/ai/remove-person")
+@app.post("/api/v1/ai/remove-person1")
 async def remove_person_and_upload(request: dict = Body(...)):
     print(f"[QUEUE INPUT] remove-person request: {json.dumps(request, indent=2)}")
     await asyncio.sleep(1)
@@ -149,7 +149,7 @@ async def remove_person_and_upload(request: dict = Body(...)):
     await main_queue.put((task_id, "remove-person", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
-@app.post("/api/v1/ai/scene-blend")
+@app.post("/api/v1/ai/scene-blend1")
 async def scene_blend(request: dict = Body(...)):
     print(f"[QUEUE INPUT] scene-blend request: {json.dumps(request, indent=2)}")
     await asyncio.sleep(1)
@@ -172,7 +172,7 @@ async def recommend_music(request: dict = Body(...)):
     await music_queue.put((task_id, request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
-@app.post("/api/v1/ai/generate-dalle-image")
+@app.post("/api/v1/ai/generate-dalle-image1")
 async def generate_dalle_image_api(request: dict = Body(...)):
     print(f"[QUEUE INPUT] generate-dalle-image request: {json.dumps(request, indent=2)}")
     task_id = str(uuid.uuid4())
