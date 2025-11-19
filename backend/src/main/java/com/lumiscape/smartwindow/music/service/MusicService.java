@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -89,7 +90,7 @@ public class MusicService {
         Long deviceId = Long.parseLong(request.deviceId());
         String deviceUniqueId = deviceService.findById(deviceId);
 
-        mqttPublishService.publishCommand(deviceUniqueId, "music", request.musicUrl());
+        mqttPublishService.publishCommand(deviceUniqueId, "music", Map.of("musicUrl", request.musicUrl()));
     }
 
     public Music findMusicByUser(Long musicId, Long userId) {
