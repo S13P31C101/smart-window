@@ -144,8 +144,8 @@ sudo pacman -S base-devel cmake git python python-pip \
     gstreamer gst-libav
 
 # Qt 6.8+ 설치 후 빌드
-git clone https://github.com/your-username/lumiscape.git
-cd lumiscape
+git clone https://github.com/S13P31C101/smart-window.git
+cd qt
 python3 -m venv venv && source venv/bin/activate
 pip install -r python/requirements.txt
 mkdir build && cd build
@@ -188,7 +188,7 @@ cmake --build . --parallel $(nproc)
 ## 📁 프로젝트 구조
 
 ```
-lumiscape/
+lumiscape/                        # git에서 qt디렉토리
 ├── src/                          # C++ 소스 코드
 │   ├── core/                     # 핵심 시스템
 │   │   ├── main.cpp              # 애플리케이션 진입점
@@ -596,9 +596,9 @@ Proprietary License - Lumiscape Project
 
 ## 📞 연락처
 
-- **프로젝트 홈페이지**: [https://github.com/your-username/lumiscape](https://github.com/your-username/lumiscape)
-- **이슈 트래커**: [https://github.com/your-username/lumiscape/issues](https://github.com/your-username/lumiscape/issues)
-- **이메일**: lumiscape-dev@example.com
+- **프로젝트 홈페이지**: [https://github.com/S13P31C101/smart-window](https://github.com/your-username/lumiscape)
+- **이슈 트래커**: [https://github.com/S13P31C101/smart-window/issues](https://github.com/your-username/lumiscape/issues)
+- **이메일**: lumiscape-dev@example.com(404)
 
 ---
 
