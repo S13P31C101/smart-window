@@ -2,7 +2,7 @@
 # 공통 설정 (모든 프로필에 적용)
 # ===============================================
 spring:
-  config:
+  #config:
   #  import: optional:file:.env[.properties] # <-- 잠시 주석 처리
   # 'dev' 프로필을 명시적으로 활성화하고, 'oauth' 프로필을 항상 포함합니다.
   profiles:
