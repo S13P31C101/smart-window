@@ -1,8 +1,5 @@
 package com.lumiscape.smartwindow.media.service;
 
-import com.lumiscape.smartwindow.device.domain.Device;
-import com.lumiscape.smartwindow.device.repository.DeviceRepository;
-import com.lumiscape.smartwindow.device.service.DeviceService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.S3Service;
@@ -11,19 +8,16 @@ import com.lumiscape.smartwindow.global.util.FileNameUtils;
 import com.lumiscape.smartwindow.media.domain.Media;
 import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.dto.*;
+import com.lumiscape.smartwindow.media.event.MediaDeletedEvent;
+import com.lumiscape.smartwindow.media.event.MediaUploadEvent;
 import com.lumiscape.smartwindow.media.repository.MediaRepository;
 import com.lumiscape.smartwindow.user.domain.entity.User;
-import com.lumiscape.smartwindow.user.domain.repository.UserRepository;
 
 import com.lumiscape.smartwindow.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,8 +35,9 @@ public class MediaService {
     private final UserService userService;
     private final S3Service s3Service;
     private final FcmNotificationService fcmNotificationService;
-    private final @Lazy DeviceService deviceService;
     private final AIService aiService;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.ai.secret}")
     private String aiCallbackSecret;
@@ -94,7 +89,14 @@ public class MediaService {
 
         Media savedMedia = mediaRepository.save(media);
 
-        aiService.requestAIGeneration(savedMedia);
+        // TODO remove deviceId
+        aiService.requestAIGeneration(savedMedia, request.deviceId());
+
+        eventPublisher.publishEvent(new MediaUploadEvent(
+                userId,
+                request.deviceId(),
+                savedMedia.getId()
+        ));
 
         return mapToMediaResponse(savedMedia);
     }
@@ -118,16 +120,7 @@ public class MediaService {
     public void deleteMedia(Long userId, Long mediaId) {
         Media mediaToDelete = findMediaByUser(mediaId, userId);
 
-        List<Device> affectedDevices = deviceService.findByAllMedia(mediaToDelete);
-
-        Media replacementMedia = (mediaToDelete.getOriginType() == MediaOrigin.AI_GENERATED && mediaToDelete.getParentMedia() != null)
-                ? mediaToDelete.getParentMedia() : null;
-
-        for (Device device : affectedDevices) {
-            device.updateMedia(replacementMedia);
-
-            deviceService.publishMediaUpdateToDevice(device);
-        }
+        eventPublisher.publishEvent(new MediaDeletedEvent(userId, mediaId));
 
         if (mediaToDelete.getOriginType() == MediaOrigin.ORIGINAL) {
             List<Media> childrenMedia = mediaRepository.findAllByParentMediaId(mediaId);
@@ -147,7 +140,21 @@ public class MediaService {
         Media parentMedia = mediaRepository.findById(request.parentMediaId())
                 .orElseThrow(() -> new CustomException(ErrorCode.IMAGE_NOT_FOUND));
 
-        String aiFileName = FileNameUtils.addSuffixBeforeExtension(parentMedia.getFileName(), "(AI)");
+        String type = FileNameUtils.extractAITypeFromKey(request.s3ObjectKey());
+        if (type == null || type.isEmpty()) {
+            log.error("[ AI ] 지원하지 않는 AI 생성 타입입니다. Type: {}", request.s3ObjectKey());
+            return;
+        }
+
+        MediaOrigin originType;
+        try {
+            originType = MediaOrigin.valueOf("AI_" + type);
+        } catch (IllegalArgumentException e) {
+            log.error("[ AI ] 지원하지 않는 AI 생성 타입입니다. Type: {}", type);
+            return;
+        }
+
+        String aiFileName = FileNameUtils.addSuffixBeforeExtension(parentMedia.getFileName(), "(" + type + ")");
 
         Media aiMedia = Media.builder()
                 .user(parentMedia.getUser())
@@ -156,13 +163,14 @@ public class MediaService {
                 .fileType(request.fileType())
                 .fileSize(request.fileSize())
                 .resolution(request.resolution())
-                .originType(MediaOrigin.AI_GENERATED)
+                .originType(originType)
                 .parentMedia(parentMedia)
                 .build();
 
         mediaRepository.save(aiMedia);
 
         // TODO FCM Push
+        fcmNotificationService.sendNotificationToUser(parentMedia.getUser(), " New AI ", " " + parentMedia.getFileName() + " 의 " + type + " 감성을 살린 AI 이미지가 생성되었습니다.");
     }
 
     public Media findMediaByUser(Long mediaId, Long userId) {

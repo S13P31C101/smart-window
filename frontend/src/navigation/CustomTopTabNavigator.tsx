@@ -1,13 +1,16 @@
 import React from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import WidgetScreen from '@/screens/custom/tabs/WidgetScreen';
-import CustomScreen from '@/screens/custom/tabs/CustomScreen';
-import AlarmScreen from '@/screens/custom/tabs/AlarmScreen';
-import SensorScreen from '@/screens/custom/tabs/SensorScreen';
+
+// 말씀해주신 4개의 올바른 스크린을 import 합니다.
+import CustomScreen from '../screens/custom/tabs/CustomScreen';
+import AlarmScreen from '../screens/custom/tabs/AlarmScreen';
+import SensorScreen from '../screens/custom/tabs/SensorScreen';
+import WidgetScreen from '../screens/custom/tabs/WidgetScreen';
+
 
 const Tab = createMaterialTopTabNavigator();
 
-function CustomTopTabNavigator() {
+const CustomTopTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -29,11 +32,11 @@ function CustomTopTabNavigator() {
       }}
     >
       <Tab.Screen name="커스텀" component={CustomScreen} />
-      <Tab.Screen name="센서" component={SensorScreen} />
       <Tab.Screen name="알람" component={AlarmScreen} />
+      <Tab.Screen name="센서" component={SensorScreen} />
       <Tab.Screen name="위젯" component={WidgetScreen} />
     </Tab.Navigator>
   );
-}
+};
 
 export default CustomTopTabNavigator;

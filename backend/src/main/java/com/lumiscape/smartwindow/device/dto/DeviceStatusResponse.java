@@ -14,4 +14,8 @@ public record DeviceStatusResponse(
     public static DeviceStatusResponse ofOpen(Device device) {
         return new DeviceStatusResponse(device.getId(), device.isOpenStatus());
     }
+
+    public static DeviceStatusResponse ofOpacity(Device device) {
+        return new DeviceStatusResponse(device.getId(), device.isOpacityStatus());
+    }
 }

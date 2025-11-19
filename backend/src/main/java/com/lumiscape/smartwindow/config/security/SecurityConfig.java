@@ -8,6 +8,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -39,11 +42,15 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/swagger-ui/**", "/v3/api-docs/**", "/auth/success", "/tokens/reissue").permitAll()
-                        .requestMatchers("/api/v1/media/ai-upload-url", "/api/v1/media/ai-callback").hasRole("AI_SERVER")
+                        .requestMatchers("/api/v1/media/ai-upload-url", "/api/v1/media/ai-callback", "/api/v1/musics/ai-callback").hasRole("AI_SERVER")
                         .anyRequest().authenticated()
                 )
 
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(endpoint -> endpoint
+                                .baseUri("/oauth2/authorization") // 👈 1. 인증 요청 URI 기본값 명시
+                                .authorizationRequestRepository(authorizationRequestRepository()) // 👈 2. 인증 요청 정보를 쿠키에 저장하도록 설정
+                        )
                         .successHandler(oAuth2SuccessHandler)
                 )
 
@@ -53,6 +60,12 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // 👇 3. AuthorizationRequestRepository 빈 추가
+    @Bean
+    public AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository() {
+        return new HttpSessionOAuth2AuthorizationRequestRepository();
     }
 
     @Bean

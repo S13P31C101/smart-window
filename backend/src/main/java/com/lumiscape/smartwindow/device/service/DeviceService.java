@@ -1,16 +1,19 @@
 package com.lumiscape.smartwindow.device.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
 import com.lumiscape.smartwindow.device.repository.DeviceRepository;
+import com.lumiscape.smartwindow.fcm.service.FcmNotificationService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
 import com.lumiscape.smartwindow.global.infra.S3Service;
 import com.lumiscape.smartwindow.media.domain.Media;
+import com.lumiscape.smartwindow.media.domain.MediaOrigin;
 import com.lumiscape.smartwindow.media.service.MediaService;
+import com.lumiscape.smartwindow.music.domain.Music;
+import com.lumiscape.smartwindow.music.service.MusicService;
 import com.lumiscape.smartwindow.user.domain.entity.User;
 
 import com.lumiscape.smartwindow.user.service.UserService;
@@ -21,6 +24,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -36,13 +40,20 @@ public class DeviceService {
     private final UserService userService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
+
     private final FcmNotificationService fcmNotificationService;
 
     private MediaService mediaService;
+    private MusicService musicService;
 
     @Autowired
     public void setMediaService(@Lazy MediaService mediaService) {
         this.mediaService = mediaService;
+    }
+
+    @Autowired
+    public void setMusicService(@Lazy MusicService musicService) {
+        this.musicService = musicService;
     }
 
     public List<DeviceDetailResponse> getMyDevice(Long userId) {
@@ -129,12 +140,24 @@ public class DeviceService {
     }
 
     @Transactional
+    public DeviceStatusResponse controlOpacity(Long userId, Long deviceId, DeviceStatusRequest request) {
+        Device device = findDeviceByUser(deviceId, userId);
+        boolean newStatus = request.status();
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "opacity", Map.of("status", newStatus));
+
+        device.updateOpacity(newStatus);
+
+        return DeviceStatusResponse.ofOpacity(device);
+    }
+
+    @Transactional
     public DeviceModeStatusResponse controlModeStatus(Long userId, Long deviceId, DeviceModeStatusRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
 
         DeviceMode newMode = DeviceMode.valueOf(request.mode().toUpperCase());
 
-        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", newMode.name());
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "mode", Map.of("status", newMode.name()));
 
         device.updateMode(newMode);
 
@@ -144,7 +167,12 @@ public class DeviceService {
     @Transactional
     public DeviceModeSettingsResponse controlModeSettings(Long userId, Long deviceId, DeviceModeSettingsRequest request) {
         Device device = findDeviceByUser(deviceId, userId);
-        Map<String, Object> newSettings = request.settings();
+        Map<String, Object> newSettings = Map.of("widgetClock", request.widgetClock(),
+                "widgetWeather", request.widgetWeather(),
+                "widgetQuotes", request.widgetQuotes(),
+                "widgetMusic", request.widgetMusic());
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "widgets", newSettings);
 
         device.updateModeSettings(newSettings);
 
@@ -168,37 +196,56 @@ public class DeviceService {
     }
 
     @Transactional
+    public void deleteDevicesMedia(Long userId, Long mediaId) {
+        Media media = mediaService.findMediaByUser(mediaId, userId);
+
+        List<Device> affectedDevices = findByAllMedia(media);
+
+        Media replacementMedia = (media.getOriginType() != MediaOrigin.ORIGINAL && media.getParentMedia() != null)
+                ? media.getParentMedia() : null;
+
+        for (Device device : affectedDevices) {
+            device.updateMedia(replacementMedia);
+            publishMediaUpdateToDevice(device);
+        }
+    }
+
+    @Transactional
+    public DeviceDetailResponse updateDeviceMusic(Long userId, Long deviceId, Long musicId) {
+        Device device = findDeviceByUser(deviceId, userId);
+
+        Music music = null;
+        if (musicId != null) {
+            music = musicService.findMusicByUser(musicId, userId);
+        }
+
+        device.updateMusic(music);
+
+        publishMusicUpdateToDevice(device);
+
+        return DeviceDetailResponse.from(device);
+    }
+
+    @Transactional
     public void updateDeviceStatusFromMqtt(String deviceUniqueId, String statusType, String payload) {
         log.info("[MQTT Inbound] ID : {}, TYPE : {}, PAYLOAD : {}", deviceUniqueId, statusType, payload);
 
         Device device = findByDeviceUniqueId(deviceUniqueId);
-        User user = device.getUser(); // 디바이스와 연결된 사용자 정보를 가져옵니다.
-        if (user == null) {
-            log.warn("Device {} has no associated user. Skipping FCM notification.", deviceUniqueId);
-            return;
-        }
-
-        String title = "스마트윈도우 알림";
-        String body = "";
 
         switch (statusType) {
             case "power":
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
-                body = device.getDeviceName() + " 전원이 " + (power ? "켜졌습니다." : "꺼졌습니다.");
-                fcmNotificationService.sendNotification(user.getId(), title, body);
+                // TODO FCM
+//                fcmNotificationService.sendNotificationToUser();
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
                 device.updateOpen(open);
-                body = device.getDeviceName() + " 창문이 " + (open ? "열렸습니다." : "닫혔습니다.");
-                fcmNotificationService.sendNotification(user.getId(), title, body);
+                // TODO FCM
                 break;
             case "sensor":
-                // TODO: 센서 값에 따른 알림 조건 및 내용 정의 필요
-                // 예를 들어, 특정 값 이상일 때만 알림을 보낼 수 있습니다.
-                // body = "새로운 센서 데이터가 감지되었습니다: " + payload;
-                // fcmNotificationService.sendNotification(user.getId(), title, body);
+                // TODO FCM
                 break;
         }
     }
@@ -218,6 +265,14 @@ public class DeviceService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
     }
 
+    // TODO improve music part
+    public String findById(Long deviceId) {
+        Device device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DEVICE_NOT_FOUND));
+
+        return device.getDeviceUniqueId();
+    }
+
     public void publishMediaUpdateToDevice(Device device) {
         Media media = device.getMedia();
 
@@ -233,5 +288,23 @@ public class DeviceService {
         Map<String, Object> payload = Map.of("mediaId", mediaId, "mediaUrl", mediaUrl);
 
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "media", payload);
+    }
+
+    public void publishMusicUpdateToDevice(Device device) {
+        Music music = device.getMusic();
+
+        Long musicId = null;
+        String musicUrl = null;
+
+        if (music != null) {
+            musicId = music.getId();
+            musicUrl = music.getMusicUrl();
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("musicId", musicId);
+        payload.put("musicUrl", musicUrl);
+
+        mqttPublishService.publishCommand(device.getDeviceUniqueId(), "music", payload);
     }
 }

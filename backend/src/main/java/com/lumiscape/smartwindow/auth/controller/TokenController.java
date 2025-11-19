@@ -24,8 +24,8 @@ public class TokenController {
     private final FcmService fcmService;
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal String userId) {
-        authService.logout(Long.valueOf(userId));
+    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long userId) {
+        authService.logout(userId);
         return ResponseEntity.ok(ApiResponse.onSuccess(HttpStatus.OK, null));
     }
 
@@ -36,8 +36,8 @@ public class TokenController {
     }
 
     @PostMapping("/mobile")
-    public ResponseEntity<ApiResponse<Void>> registerFcmToken(@AuthenticationPrincipal String userId, @RequestBody FcmTokenRequest request) {
-        fcmService.registerFcmToken(Long.valueOf(userId), request);
+    public ResponseEntity<ApiResponse<Void>> registerFcmToken(@AuthenticationPrincipal Long userId, @RequestBody FcmTokenRequest request) {
+        fcmService.registerFcmToken(userId, request);
         return ResponseEntity.ok(ApiResponse.onSuccess(HttpStatus.OK, null));
     }
 }

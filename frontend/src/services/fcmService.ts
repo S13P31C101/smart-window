@@ -152,7 +152,7 @@ class FCMService {
   async sendTokenToServer(token: string) {
     try {
       console.log(`📡 [FCM] Sending token to server...`);
-      await apiClient.post('/devices/fcm', { fcmToken: token }); // 수정: API 엔드포인트 및 payload
+      await apiClient.post('/mobile/fcm-token', { fcmToken: token }); // 수정된 부분
       console.log('📡 [FCM] ✅ Token successfully sent to server');
       return { success: true };
     } catch (error) {

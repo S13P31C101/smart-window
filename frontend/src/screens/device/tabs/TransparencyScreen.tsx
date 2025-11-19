@@ -1,14 +1,41 @@
 import React from 'react';
-import { StyleSheet, Text, View, Switch, ImageBackground } from 'react-native';
+import { StyleSheet, Text, View, Switch, ImageBackground, ActivityIndicator } from 'react-native';
+import { useDeviceStore } from '@/stores/deviceStore';
+import { useGetDeviceDetail, useUpdateDeviceOpacity } from '@/api/device';
 
 function TransparencyScreen() {
-  const [isTransparent, setIsTransparent] = React.useState(true);
+  const selectedDeviceId = useDeviceStore(state => state.selectedDeviceId);
+  const { data: deviceDetail, isLoading } = useGetDeviceDetail(selectedDeviceId);
+  const { mutate: updateOpacity, isPending } = useUpdateDeviceOpacity();
+
+  const handleToggleTransparency = () => {
+    if (deviceDetail) {
+      updateOpacity({
+        deviceId: deviceDetail.deviceId,
+        status: !deviceDetail.opacityStatus,
+      });
+    }
+  };
+
+  if (isLoading) {
+    return <ActivityIndicator style={styles.loadingContainer} size="large" color="white" />;
+  }
+
+  if (!deviceDetail) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.statusText}>디바이스 정보를 불러올 수 없습니다.</Text>
+      </View>
+    );
+  }
+
+  // opacityStatus가 true이면 '불투명', false이면 '투명'
+  const isTransparent = !deviceDetail.opacityStatus;
 
   return (
     <ImageBackground
       source={require('@/assets/bgimage.jpeg')}
       style={styles.container}
-      // '불투명' 상태일 때 (isTransparent가 false) 배경 이미지에 블러 효과를 줍니다.
       blurRadius={isTransparent ? 0 : 15}
     >
       <View style={styles.statusContainer}>
@@ -24,8 +51,9 @@ function TransparencyScreen() {
             {isTransparent ? '투명' : '불투명'}
           </Text>
           <Switch
-            onValueChange={setIsTransparent}
+            onValueChange={handleToggleTransparency}
             value={isTransparent}
+            disabled={isPending || !deviceDetail.powerStatus} // API 요청 중이거나 전원이 꺼져있으면 비활성화
             trackColor={{ false: '#767577', true: '#81b0ff' }}
             thumbColor={isTransparent ? '#f5dd4b' : '#f4f3f4'}
           />
@@ -36,6 +64,12 @@ function TransparencyScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1E293B', // 배경색 추가
+  },
   container: {
     flex: 1,
     justifyContent: 'space-between',

@@ -12,9 +12,11 @@ public record DeviceDetailResponse(
         String deviceName,
         boolean powerStatus,
         boolean openStatus,
+        boolean opacityStatus,
         DeviceMode modeStatus,
         Map<String, Object> modeSettings,
         Long mediaId,
+        Long musicId,
         OffsetDateTime createdAt
 ) {
 
@@ -25,9 +27,11 @@ public record DeviceDetailResponse(
                 device.getDeviceName(),
                 device.isPowerStatus(),
                 device.isOpenStatus(),
+                device.isOpacityStatus(),
                 device.getModeStatus(),
                 device.getModeSettings(),
                 device.getMedia() != null ? device.getMedia().getId() : null,
+                device.getMusic() != null ? device.getMusic().getId() : null,
                 device.getCreatedAt()
         );
     }

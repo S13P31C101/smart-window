@@ -1,135 +1,316 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  Animated,
   Dimensions,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  PermissionsAndroid,
+  ActivityIndicator,
+  FlatList,
+  Button,
+  Animated,
   PanResponder,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import LinearGradient from 'react-native-linear-gradient';
+import { BleManager, Device } from 'react-native-ble-plx';
+import { Buffer } from 'buffer';
+import { useFocusEffect } from '@react-navigation/native'; // useFocusEffect import
+import { useDeviceStore } from '@/stores/deviceStore'; // 스토어 import
+
+const SERVICE_UUID = '2b8d0001-6828-46af-98aa-557761b15400';
+const WRITE_CHARACTERISTIC_UUID = '2b8d0002-6828-46af-98aa-557761b15400';
+
+const bleManager = new BleManager();
 
 const { width } = Dimensions.get('window');
 const WINDOW_FRAME_WIDTH = width - 80;
-// 창틀의 테두리(borderWidth: 4)를 고려하여 내부 창문의 너비를 정밀하게 계산합니다.
-const PANE_WIDTH = (WINDOW_FRAME_WIDTH - 8) / 2; 
-const WINDOW_FRAME_HEIGHT = PANE_WIDTH * 1.1; // 비율을 살짝 조정하여 더 안정적으로 보이게 합니다.
+const PANE_WIDTH = (WINDOW_FRAME_WIDTH - 8) / 2;
+const WINDOW_FRAME_HEIGHT = PANE_WIDTH * 1.1;
 
 function OpenCloseScreen() {
-  const [openPercentage, setOpenPercentage] = useState(0);
+  const [allDevices, setAllDevices] = useState<Device[]>([]);
+  const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
+  const [percentage, setPercentage] = useState(0);
+  const [isScanning, setIsScanning] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('기기를 찾는 중...');
+
   const translateX = useRef(new Animated.Value(0)).current;
   const lastPosition = useRef(0);
+  const setOpenPercentage = useDeviceStore(state => state.setOpenPercentage); // 스토어 함수 가져오기
 
-  // PanResponder 설정
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]);
+      return (
+        granted['android.permission.BLUETOOTH_CONNECT'] === 'granted' &&
+        granted['android.permission.BLUETOOTH_SCAN'] === 'granted' &&
+        granted['android.permission.ACCESS_FINE_LOCATION'] === 'granted'
+      );
+    }
+    return true;
+  };
+
+  const scanForDevices = async () => {
+    const permissions = await requestPermissions();
+    if (!permissions) {
+      Alert.alert('권한 오류', 'BLE 스캔을 위한 권한이 필요합니다.');
+      return;
+    }
+    setAllDevices([]);
+    setIsScanning(true);
+    bleManager.startDeviceScan(null, null, (error, device) => {
+      if (error) {
+        console.error('Scan error:', error);
+        setIsScanning(false);
+        return;
+      }
+      if (device && (device.name || device.localName)) {
+        setAllDevices(prev => {
+          if (!prev.find(d => d.id === device.id)) {
+            return [...prev, device];
+          }
+          return prev;
+        });
+      }
+    });
+    setTimeout(() => {
+      bleManager.stopDeviceScan();
+      setIsScanning(false);
+    }, 10000);
+  };
+  
+  const connectToDevice = async (device: Device) => {
+    try {
+      bleManager.stopDeviceScan();
+      setIsScanning(false);
+      const connected = await device.connect();
+      setConnectedDevice(connected);
+      await connected.discoverAllServicesAndCharacteristics();
+    } catch (e) {
+      console.error('Connection failed', e);
+    }
+  };
+
+  const disconnectDevice = () => {
+    // --- 진행 중인 스캔을 먼저 멈춥니다. ---
+    bleManager.stopDeviceScan();
+    setIsScanning(false);
+
+    if (connectedDevice) {
+      bleManager.cancelDeviceConnection(connectedDevice.id);
+      setConnectedDevice(null);
+      setPercentage(0);
+      lastPosition.current = 0;
+      translateX.setValue(0);
+    }
+  };
+
+  const writePercentage = async (value: number) => {
+    if (!connectedDevice) return;
+    try {
+      const data = [0x2a, 0x17, 0x10, 0x00, 0x00, Math.round(value)];
+      const base64Data = Buffer.from(data).toString('base64');
+      
+      console.log(`[BLE] Attempting to write: ${Math.round(value)}% (Base64: ${base64Data})`);
+
+      // --- 함수를 'WithResponse'에서 'WithoutResponse'로 변경합니다. ---
+      await bleManager.writeCharacteristicWithoutResponseForDevice(
+        connectedDevice.id,
+        SERVICE_UUID,
+        WRITE_CHARACTERISTIC_UUID,
+        base64Data
+      );
+
+      console.log('[BLE] Write command sent successfully (without response).');
+
+    } catch (e) {
+      console.error('[BLE] Write failed:', e);
+      // 'WithoutResponse'는 보통 실패 시에도 에러를 던지지 않을 수 있으나,
+      // 만약을 위해 로그는 남겨둡니다.
+    }
+  };
+  
+  const handleSliderChange = (value: number) => {
+    setPercentage(value);
+    const newPosition = (value / 100) * PANE_WIDTH;
+    lastPosition.current = newPosition;
+    translateX.setValue(newPosition);
+  };
+  
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        translateX.setOffset(lastPosition.current);
-        translateX.setValue(0);
-      },
-      onPanResponderMove: (_, gesture) => {
-        // useNativeDriver: false 일 때만 Animated.event를 안전하게 사용할 수 있습니다.
-        // 여기서는 직접 값을 설정하여 호환성 문제를 피합니다.
-        translateX.setValue(gesture.dx);
-      },
-      onPanResponderRelease: (_, gesture) => {
-        translateX.flattenOffset(); // 오프셋을 값에 합칩니다.
-        lastPosition.current += gesture.dx;
+      // 드래그 시작 시 아무것도 할 필요가 없습니다. lastPosition.current를 기준으로 계산합니다.
+      onPanResponderGrant: () => {},
+      // 드래그 중일 때
+      onPanResponderMove: (e, gesture) => {
+        let newPosition = lastPosition.current + gesture.dx;
 
-        // 이동 범위 제한
-        if (lastPosition.current < 0) {
-          lastPosition.current = 0;
-        } else if (lastPosition.current > PANE_WIDTH) {
-          lastPosition.current = PANE_WIDTH;
-        }
-        
-        // 최종 위치로 부드럽게 이동
-        Animated.spring(translateX, {
-          toValue: lastPosition.current,
-          useNativeDriver: true, // 애니메이션 자체에는 네이티브 드라이버 사용
-        }).start();
+        // 창문이 프레임을 벗어나지 않도록 위치를 제한합니다.
+        if (newPosition < 0) newPosition = 0;
+        if (newPosition > PANE_WIDTH) newPosition = PANE_WIDTH;
+
+        // 애니메이션 값과 퍼센트 UI를 실시간으로 업데이트합니다.
+        translateX.setValue(newPosition);
+        setPercentage((newPosition / PANE_WIDTH) * 100);
       },
-    }),
+      // 드래그가 끝났을 때
+      onPanResponderRelease: (_, gestureState) => {
+        let finalPosition = lastPosition.current + gestureState.dx;
+
+        // 최종 위치도 제한합니다.
+        if (finalPosition < 0) finalPosition = 0;
+        if (finalPosition > PANE_WIDTH) finalPosition = PANE_WIDTH;
+
+        // 다음 드래그를 위해 마지막 위치를 업데이트합니다.
+        lastPosition.current = finalPosition;
+        
+        const finalPercentage = (finalPosition / PANE_WIDTH) * 100;
+
+        // 최종 퍼센트 값을 BLE 기기로 전송합니다.
+        writePercentage(finalPercentage);
+        setOpenPercentage(finalPercentage); // << 전역 상태 업데이트 추가
+      },
+    })
   ).current;
 
-  // 슬라이더 값 변경 시
-  const handleSliderChange = (value: number) => {
-    const newPosition = (value / 100) * PANE_WIDTH;
-    Animated.timing(translateX, {
-      toValue: newPosition,
-      duration: 50,
-      useNativeDriver: true,
-    }).start();
-    lastPosition.current = newPosition;
-    setOpenPercentage(Math.round(value));
-  };
-  
-  // translateX 값(px)이 openPercentage(%)와 동기화되도록 합니다.
-  translateX.addListener(({ value }) => {
-    const percentage = (value / PANE_WIDTH) * 100;
-    const clampedPercentage = Math.max(0, Math.min(percentage, 100));
-    setOpenPercentage(Math.round(clampedPercentage));
-  });
+  const renderDeviceItem = ({ item }: { item: Device }) => (
+    <TouchableOpacity style={styles.deviceItem} onPress={() => connectToDevice(item)}>
+      <Text style={styles.deviceText}>{item.name || item.localName || 'Unknown'}</Text>
+      <Text style={styles.deviceText}>{item.id}</Text>
+    </TouchableOpacity>
+  );
+
+  // --- 자동 연결 로직 (핵심) ---
+  useFocusEffect(
+    useCallback(() => {
+      const targetDeviceName = 'CLWM-B07';
+      let isConnecting = false;
+
+      const scanAndConnect = async () => {
+        try {
+          // 1. 스캔 시작
+          setStatusMessage(`'${targetDeviceName}' 기기를 스캔 중...`);
+          bleManager.startDeviceScan(null, null, (error, device) => {
+            if (error) {
+              console.error('Scan error:', error);
+              setStatusMessage('스캔 중 오류 발생');
+              bleManager.stopDeviceScan();
+              return;
+            }
+
+            // 2. 기기 발견 시 이름 확인
+            if (device && device.name === targetDeviceName && !isConnecting) {
+              isConnecting = true;
+              bleManager.stopDeviceScan(); // 찾았으면 스캔 중지
+              // setStatusMessage(`'${targetDeviceName}'에 연결됨`);
+
+              // 3. 연결 시도
+              connectToDevice(device); // 기존에 있던 연결 함수 재사용
+            }
+          });
+          
+          // 10초 후에도 못 찾으면 스캔 중지
+          setTimeout(() => {
+            if (!isConnecting && !connectedDevice) {
+              bleManager.stopDeviceScan();
+              // setStatusMessage(`'${targetDeviceName}'을 찾을 수 없습니다.`);
+            }
+          }, 10000);
+
+        } catch (error) {
+          console.error('Auto-connect error:', error);
+          setStatusMessage('자동 연결 실패');
+        }
+      };
+
+      if (!connectedDevice) { // 이미 연결된 기기가 없을 때만 실행
+        scanAndConnect();
+      }
+
+      // 화면을 벗어날 때 정리(cleanup) 함수
+      return () => {
+        bleManager.stopDeviceScan();
+        console.log('[BLE] Leaving screen, scan stopped.');
+      };
+    }, [connectedDevice]) // connectedDevice가 바뀔 때마다 이 효과를 재평가
+  );
+  // ---------------------------------
 
   return (
     <LinearGradient colors={['#1A2F4D', '#2D5580']} style={styles.container}>
-      <Text style={styles.title}>창문 개폐</Text>
-
-      <View style={styles.windowContainer}>
-        <View style={styles.fixedPane} />
-        <Animated.View
-          style={[styles.slidingPane, { transform: [{ translateX }] }]}
-          {...panResponder.panHandlers}
-        >
-          <View style={styles.glassReflection1} />
-          <View style={styles.glassReflection2} />
-          <View style={styles.handle} />
-        </Animated.View>
-      </View>
-
-      <View style={styles.controlsContainer}>
-        <View style={styles.sliderLabels}>
-          <Text style={styles.labelText}>닫힘</Text>
-          <Text style={styles.labelText}>열림</Text>
+      {connectedDevice ? (
+        <View style={styles.controlContainer}>
+          {/* <Text style={styles.title}>연결됨: {connectedDevice.name}</Text> */}
+          <View style={styles.windowContainer}>
+            <View style={styles.fixedPane} />
+            <Animated.View 
+                style={[styles.slidingPane, { transform: [{ translateX }] }]} 
+                {...panResponder.panHandlers}
+            />
+          </View>
+          <Text style={styles.percentageValue}>{`${Math.round(percentage)}%`}</Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={0}
+            maximumValue={100}
+            step={1}
+            value={percentage}
+            onValueChange={handleSliderChange}
+            onSlidingComplete={value => {
+              writePercentage(value);
+              setOpenPercentage(value); // 전역 상태 업데이트
+            }}
+            minimumTrackTintColor="#FFFFFF"
+            maximumTrackTintColor="#5A6A8A"
+            thumbTintColor="#FFFFFF"
+          />
+          <Button title="연결 해제" onPress={disconnectDevice} color="#E53935" />
         </View>
-        <View style={styles.percentageMarkers}>
-          {['0%', '25%', '50%', '75%', '100%'].map(p => (
-            <Text key={p} style={styles.markerText}>{p}</Text>
-          ))}
+      ) : (
+        <View style={styles.scanContainer}>
+          <Text style={styles.title}>창문 제어</Text>
+          <TouchableOpacity 
+            style={[styles.scanButton, isScanning && styles.scanButtonDisabled]} 
+            onPress={scanForDevices} 
+            disabled={isScanning}
+          >
+            {isScanning ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.scanButtonText}>주변 기기 검색</Text>}
+          </TouchableOpacity>
+          <FlatList
+            data={allDevices}
+            renderItem={renderDeviceItem}
+            keyExtractor={item => item.id}
+            style={styles.list}
+          />
         </View>
-        <Slider
-          style={styles.slider}
-          minimumValue={0}
-          maximumValue={100}
-          step={1}
-          value={openPercentage}
-          onValueChange={handleSliderChange}
-          minimumTrackTintColor="#FFFFFF"
-          maximumTrackTintColor="#5A6A8A"
-          thumbTintColor="#FFFFFF"
-        />
-        <Text style={styles.percentageValue}>{`${openPercentage}%`}</Text>
-      </View>
+      )}
+      <Text style={styles.statusMessage}>{statusMessage}</Text>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    paddingTop: 40,
-    paddingHorizontal: 40,
-  },
-  title: {
-    color: '#F0F7FF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 40,
-    width: '100%',
-  },
+  container: { flex: 1, padding: 20 },
+  title: { color: '#F0F7FF', fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginVertical: 20 },
+  scanContainer: { flex: 1 },
+  scanButton: { backgroundColor: '#4A90E2', padding: 15, borderRadius: 10, alignItems: 'center' },
+  scanButtonDisabled: { backgroundColor: '#5A6A8A' },
+  scanButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  list: { marginTop: 20 },
+  deviceItem: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 15, marginBottom: 10, borderRadius: 8 },
+  deviceText: { color: '#FFFFFF' },
+  controlContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  percentageValue: { color: '#FFFFFF', fontSize: 48, fontWeight: 'bold', marginVertical: 20 },
+  slider: { width: '100%', height: 40 },
   windowContainer: {
     width: WINDOW_FRAME_WIDTH,
     height: WINDOW_FRAME_HEIGHT,
@@ -137,10 +318,11 @@ const styles = StyleSheet.create({
     borderColor: '#4A5E7E',
     borderWidth: 4,
     borderRadius: 16,
+    marginBottom: 20,
   },
   fixedPane: {
     position: 'absolute',
-    right: 4, // 창틀 안쪽에 위치
+    right: 4,
     top: 4,
     bottom: 4,
     width: PANE_WIDTH,
@@ -150,7 +332,7 @@ const styles = StyleSheet.create({
   },
   slidingPane: {
     position: 'absolute',
-    left: 4, // 창틀 안쪽에 위치
+    left: 4,
     top: 4,
     bottom: 4,
     width: PANE_WIDTH,
@@ -158,65 +340,12 @@ const styles = StyleSheet.create({
     borderColor: '#495057',
     borderWidth: 4,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
-  glassReflection1: {
-    position: 'absolute',
-    width: 2,
-    height: '120%',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    transform: [{ rotate: '-45deg' }],
-    left: '40%',
-  },
-  glassReflection2: {
-    position: 'absolute',
-    width: 2,
-    height: '120%',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    transform: [{ rotate: '-45deg' }],
-    left: '55%',
-  },
-  handle: {
-    position: 'absolute',
-    right: 12,
-    width: 12,
-    height: 48,
-    backgroundColor: '#89B1F3',
-    borderRadius: 6,
-  },
-  controlsContainer: {
-    width: '100%',
-    marginTop: 60,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  labelText: {
-    color: '#B0C4DE',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  percentageMarkers: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  markerText: {
-    color: '#8291AC',
-    fontSize: 12,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  percentageValue: {
+  statusMessage: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'right',
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 

@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, memo } from 'react';
-import { StyleSheet, Text, View, Animated, Image, Pressable, Dimensions } from 'react-native';
-import Slider from '@react-native-community/slider';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, Animated, Image, Pressable, Dimensions, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Svg, Circle, G, Defs, Filter, FeDropShadow, Path, RadialGradient, Stop, FeComposite, ClipPath, Rect, FeGaussianBlur, FeOffset, FeMerge, FeMergeNode, Ellipse } from 'react-native-svg';
+import { Svg, Circle, G, Defs, RadialGradient, Stop, Filter, FeGaussianBlur, FeOffset, FeMerge, FeMergeNode, ClipPath, Rect, Ellipse } from 'react-native-svg';
 import { COLORS } from '@/constants/color';
+import { useDeviceStore } from '@/stores/deviceStore';
+import { useGetDeviceDetail, useUpdatePowerStatus } from '@/api/device';
 
 // --- 상수 정의 ---
 const UI_COLORS = {
@@ -22,13 +23,13 @@ const { width } = Dimensions.get('window');
 const AnimatedStop = Animated.createAnimatedComponent(Stop); // AnimatedStop 추가
 
 // --- 헬퍼 컴포넌트 ---
-const Icons8Light = memo(({ opacity }: { opacity: number }) => (
+const Icons8Light = React.memo(({ opacity }: { opacity: number }) => (
   <View style={{ width: 34, height: 34 }}>
     <Icon name="bulb" size={34} color={`rgba(255, 255, 255, ${opacity})`} />
   </View>
 ));
 
-const ToggleThumb = memo(({ isOn }: { isOn: boolean }) => (
+const ToggleThumb = React.memo(({ isOn }: { isOn: boolean }) => (
   <Svg height="20" width="20" viewBox="0 0 24 24">
     <Defs>
       <Filter id="shadow">
@@ -45,7 +46,7 @@ const ToggleThumb = memo(({ isOn }: { isOn: boolean }) => (
 ));
 
 // 빛 줄기 효과를 옆으로 긴 타원의 절반 모양으로 수정
-const LightBeamEffect = memo(() => (
+const LightBeamEffect = React.memo(() => (
   <Svg height="100%" width="100%" viewBox="0 0 100 35">
     <Defs>
       <ClipPath id="clip">
@@ -64,47 +65,53 @@ const LightBeamEffect = memo(() => (
 
 // --- 메인 밝기 화면 컴포넌트 ---
 function BrightnessScreen() {
-  const [isOn, setIsOn] = useState(false);
-  const [brightness, setBrightness] = useState(0); // 0-100
+  const selectedDeviceId = useDeviceStore(state => state.selectedDeviceId);
+  const { data: deviceDetail, isLoading } = useGetDeviceDetail(selectedDeviceId);
+  const { mutate: updatePower } = useUpdatePowerStatus();
 
   const animation = useRef(new Animated.Value(0)).current;
   const switchStateAnim = useRef(new Animated.Value(0)).current;
 
-  // 모든 애니메이션을 하나의 useEffect에서 제어
+  // deviceDetail의 powerStatus에 따라 애니메이션을 제어
   useEffect(() => {
-    // 목표값 설정: isOn이 true이면 밝기 값을, false이면 0을 목표로 함
-    const targetValue = isOn ? brightness / 100 : 0;
+    if (deviceDetail) {
+      const isOn = deviceDetail.powerStatus;
+      // isOn이 true이면 밝기 100%(1), false이면 0%(0)을 목표로 함
+      const targetValue = isOn ? 1 : 0;
 
-    // 두 애니메이션을 동시에 실행
-    Animated.parallel([
-      Animated.timing(animation, {
-        toValue: targetValue,
-        duration: ANIMATION_DURATION,
-        useNativeDriver: false,
-      }),
-      Animated.timing(switchStateAnim, {
-        toValue: isOn ? 1 : 0,
-        duration: ANIMATION_DURATION,
-        useNativeDriver: false,
-      })
-    ]).start();
-  }, [isOn, brightness]); // isOn 또는 brightness가 변경될 때마다 실행
-
+      Animated.parallel([
+        Animated.timing(animation, {
+          toValue: targetValue,
+          duration: ANIMATION_DURATION,
+          useNativeDriver: false,
+        }),
+        Animated.timing(switchStateAnim, {
+          toValue: isOn ? 1 : 0,
+          duration: ANIMATION_DURATION,
+          useNativeDriver: false,
+        })
+      ]).start();
+    }
+  }, [deviceDetail]); // deviceDetail이 변경될 때마다 실행
 
   const handleToggle = () => {
-    const newIsOn = !isOn;
-    setIsOn(newIsOn);
-    if (newIsOn && brightness === 0) {
-      setBrightness(30);
-    } else if (!newIsOn) {
-      setBrightness(0);
+    if (deviceDetail) {
+      updatePower({
+        deviceId: deviceDetail.deviceId,
+        powerStatus: !deviceDetail.powerStatus
+      });
     }
   };
-  const handleSliderChange = (value: number) => {
-    setBrightness(value);
-    if (value > 0 && !isOn) setIsOn(true);
-    else if (value === 0 && isOn) setIsOn(false);
-  };
+
+  if (isLoading) {
+    return <ActivityIndicator style={{ flex: 1, justifyContent: 'center' }} />;
+  }
+
+  if (!deviceDetail) {
+    return <View style={styles.container}><Text style={{color: 'white'}}>디바이스 정보를 불러올 수 없습니다.</Text></View>;
+  }
+
+  const isOn = deviceDetail.powerStatus;
 
   const glowScale = animation.interpolate({ inputRange: [0, 1], outputRange: [0, 1.5] });
   const glowOpacity = animation.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 1] });
@@ -114,6 +121,7 @@ function BrightnessScreen() {
   const lampGlowOpacity = animation.interpolate({ inputRange: [0, 1], outputRange: [0, 0.6] });
   const lightBeamOpacity = animation.interpolate({ inputRange: [0, 0.3], outputRange: [0, 0.25], extrapolate: 'clamp' });
   const switchBgColor = animation.interpolate({ inputRange: [0, 0.01], outputRange: [UI_COLORS.switchTrackOff, UI_COLORS.switchTrackOn] });
+
 
   return (
     <View style={styles.container}>
@@ -156,26 +164,7 @@ function BrightnessScreen() {
           <Text style={styles.switchLabel}>{isOn ? 'ON' : 'OFF'}</Text>
         </View>
 
-        {isOn && (
-          <Animated.View style={[styles.sliderContainer, { opacity: animation }]}>
-            <Text style={styles.sliderLabel}>Light Intensity</Text>
-            <View style={styles.sliderWrapper}>
-              <Icons8Light opacity={0.3} />
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={100}
-                value={brightness}
-                onValueChange={handleSliderChange}
-                // 채워진 트랙과 손잡이를 모두 흰색으로 변경하여 시인성을 극대화합니다.
-                minimumTrackTintColor={COLORS.white}
-                maximumTrackTintColor={UI_COLORS.switchTrackOff}
-                thumbTintColor={COLORS.white}
-              />
-              <Icons8Light opacity={1} />
-            </View>
-          </Animated.View>
-        )}
+        {/* 슬라이더 관련 UI 모두 제거 */}
       </View>
     </View>
   );
@@ -200,16 +189,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchLabel: { color: COLORS.textPrimary, fontSize: 16, fontWeight: '500', marginLeft: 10, width: 40 },
-  sliderContainer: { width: '100%', marginTop: 40 },
-  sliderLabel: { color: COLORS.textPrimary, fontSize: 16, fontWeight: '500' },
-  sliderWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 },
-  slider: { 
-    flex: 1, 
-    height: 40, 
-    marginHorizontal: 5,
-  },
-  // thumbContainer 스타일 (thumbImage를 사용할 경우)
-  // thumbContainer: {
+  // sliderContainer: { width: '100%', marginTop: 40 }, // 슬라이더 관련 스타일 제거
+  // sliderLabel: { color: COLORS.textPrimary, fontSize: 16, fontWeight: '500' }, // 슬라이더 관련 스타일 제거
+  // sliderWrapper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 15 }, // 슬라이더 관련 스타일 제거
+  // slider: { 
+  //   flex: 1, 
+  //   height: 40, 
+  //   marginHorizontal: 5,
+  // },
+  // thumbContainer: { // thumbImage를 사용할 경우 스타일 제거
   //   width: 24,
   //   height: 24,
   //   justifyContent: 'center',

@@ -10,19 +10,23 @@ import {
   Alert,
   Modal,
   TextInput,
+  ListRenderItemInfo, // 1. ListRenderItemInfo 타입을 import 합니다.
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useGetMyMedia, useUpdateMediaName, useDeleteMedia } from '@/api/media';
 import type { MediaResponse } from '@/api/media';
+import { useUpdateDeviceMedia } from '@/api/device'; // 1. 디바이스 미디어 변경 훅 import
+import { useDeviceStore } from '@/stores/deviceStore'; // 2. 현재 선택된 디바이스 ID를 가져오기 위해 import
 
 type MediaCardProps = {
   item: MediaResponse;
   onUpdateName: (mediaId: number, currentName: string) => void;
   onDelete: (mediaId: number) => void;
+  onApplyToDevice: (mediaId: number) => void; // 3. 디바이스 적용 핸들러 prop 추가
 };
 
 // 각 아이템을 렌더링할 컴포넌트
-const MediaCard = ({ item, onUpdateName, onDelete }: MediaCardProps) => (
+const MediaCard = ({ item, onUpdateName, onDelete, onApplyToDevice }: MediaCardProps) => (
   <View style={styles.card}>
     <Image source={{ uri: item.downloadUrl }} style={styles.cardImage} />
     <View style={styles.actionsContainer}>
@@ -42,26 +46,25 @@ const MediaCard = ({ item, onUpdateName, onDelete }: MediaCardProps) => (
       <Text style={styles.cardTimestamp}>
         {new Date(item.createdAt).toLocaleString('ko-KR')}
       </Text>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.backgroundButton}>
-          <Text style={styles.buttonText}>배경만</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.videoButton}>
-          <Icon name="play" size={16} color="#FFF" />
-          <Text style={[styles.buttonText, styles.videoButtonText]}>
-            동영상 보기
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* 4. 기존 버튼 컨테이너를 '디바이스에 적용' 버튼 하나로 교체 */}
+      <TouchableOpacity 
+        style={styles.applyButton}
+        onPress={() => onApplyToDevice(item.mediaId)}
+      >
+        <Icon name="phone-portrait-outline" size={18} color="#FFF" />
+        <Text style={styles.applyButtonText}>디바이스에 적용</Text>
+      </TouchableOpacity>
     </View>
   </View>
 );
 
 function StorageScreen() {
-  // 1. 모든 훅 호출을 컴포넌트 최상단에 배치합니다.
+  // 5. 모든 훅 호출을 컴포넌트 최상단에 배치합니다.
   const { data: mediaList, isLoading, isError, error } = useGetMyMedia();
   const { mutate: updateName } = useUpdateMediaName();
   const { mutate: deleteMedia } = useDeleteMedia();
+  const { mutate: updateDeviceMedia } = useUpdateDeviceMedia();
+  const selectedDeviceId = useDeviceStore(state => state.selectedDeviceId);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMedia, setEditingMedia] = useState<MediaResponse | null>(null);
   const [newName, setNewName] = useState('');
@@ -93,6 +96,25 @@ function StorageScreen() {
     ]);
   };
 
+  // 6. 디바이스에 미디어를 적용하는 핸들러 함수 추가
+  const handleApplyToDevice = (mediaId: number) => {
+    if (!selectedDeviceId) {
+      Alert.alert('오류', '디바이스가 선택되지 않았습니다.');
+      return;
+    }
+    updateDeviceMedia(
+      { deviceId: selectedDeviceId, data: { mediaId } },
+      {
+        onSuccess: () => {
+          Alert.alert('성공', '이미지가 디바이스에 적용되었습니다.');
+        },
+        onError: () => {
+          Alert.alert('오류', '이미지를 적용하는 중 문제가 발생했습니다.');
+        }
+      }
+    );
+  };
+
   // 2. 모든 훅이 호출된 이후에 로딩 및 에러 상태를 처리합니다.
   if (isLoading) {
     return (
@@ -113,6 +135,9 @@ function StorageScreen() {
       </View>
     );
   }
+
+  // 7. FlatList에 들어갈 데이터를 'ORIGINAL' 타입만 필터링합니다.
+  const originalMedia = mediaList?.filter(item => item.originType === 'ORIGINAL');
 
   return (
     <View style={styles.container}>
@@ -150,15 +175,16 @@ function StorageScreen() {
       {/* --- 여기까지 --- */}
 
       <FlatList
-        data={mediaList}
-        renderItem={({ item }) => (
+        data={originalMedia} // 8. 필터링된 데이터를 사용합니다.
+        renderItem={({ item }: ListRenderItemInfo<MediaResponse>) => ( // 2. item의 타입을 명시합니다.
           <MediaCard
             item={item}
             onUpdateName={() => handleOpenUpdateModal(item)}
             onDelete={handleDelete}
+            onApplyToDevice={handleApplyToDevice}
           />
         )}
-        keyExtractor={item => item.mediaId.toString()}
+        keyExtractor={(item: MediaResponse) => item.mediaId.toString()}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -265,35 +291,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     marginTop: 4,
+    marginBottom: 16, // 10. 적용 버튼과의 간격을 위해 마진 추가
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    marginTop: 16,
-    gap: 12, // 버튼 사이 간격
-  },
-  backgroundButton: {
-    flex: 1,
-    backgroundColor: '#A77693', // 배경만 버튼 색상
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  videoButton: {
-    flex: 1,
-    backgroundColor: '#1E3A8A', // 동영상 보기 버튼 색상
+  // 11. 기존 buttonContainer, backgroundButton, videoButton 관련 스타일 제거
+  // 12. 새로운 applyButton 관련 스타일 추가
+  applyButton: {
+    backgroundColor: '#1E3A8A',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
   },
-  buttonText: {
+  applyButtonText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  videoButtonText: {
     marginLeft: 8,
   },
   // --- 모달 스타일 추가 ---

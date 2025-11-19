@@ -1,22 +1,40 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { COLORS } from '@/constants/color';
 
 type HeaderProps = {
   title: string;
+  showBackButton?: boolean; // 뒤로가기 버튼 표시 여부
+  showProfileButton?: boolean; // 프로필 버튼 표시 여부
 };
 
-const Header = ({ title }: HeaderProps) => {
+const Header = ({ title, showBackButton = true, showProfileButton = true }: HeaderProps) => {
   const navigation = useNavigation();
 
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Icon name="arrow-back" size={24} color="white" />
-      </TouchableOpacity>
+      {/* 1. 뒤로가기 버튼 */}
+      <View style={styles.buttonContainer}>
+        {showBackButton && (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.button}>
+            <Icon name="arrow-back" size={24} color={COLORS.iconPrimary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* 2. 타이틀 */}
       <Text style={styles.headerTitle}>{title}</Text>
-      <View style={{ width: 24 }} />
+
+      {/* 3. 프로필 버튼 */}
+      <View style={styles.buttonContainer}>
+        {showProfileButton && (
+          <TouchableOpacity onPress={() => navigation.navigate('MyPage')} style={styles.button}>
+            <Icon name="person-circle-outline" size={28} color={COLORS.iconPrimary} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -31,11 +49,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerTitle: {
-    color: 'white',
+    color: COLORS.textPrimary,
     fontSize: 20,
     fontWeight: 'bold',
   },
-  backButton: {
+  buttonContainer: {
+    width: 40, // 버튼 영역 너비 고정
+    alignItems: 'center',
+  },
+  button: {
     padding: 5,
   },
 });
