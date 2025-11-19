@@ -140,7 +140,7 @@ async def process_main_request(task_type, req):
 
 # --- API ---
 
-@app.post("/api/v1/ai/remove-person1")
+@app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
     print(f"[QUEUE INPUT] remove-person request: {json.dumps(request, indent=2)}")
     global music_in_progress
