@@ -16,6 +16,6 @@ public record DeviceStatusResponse(
     }
 
     public static DeviceStatusResponse ofOpacity(Device device) {
-        return new DeviceStatusResponse(device.getId(), device.isOpenStatus());
+        return new DeviceStatusResponse(device.getId(), device.isOpacityStatus());
     }
 }
