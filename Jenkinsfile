@@ -12,6 +12,7 @@ pipeline {
             steps {
                 dir('backend') {
                     sh 'cp /application-oauth.yml ./src/main/resources/application-oauth.yml'
+                    sh 'cp /smartwindow-a4e7a-firebase-adminsdk-fbsvc-da2b0ce557.json ./src/main/resources/smartwindow-a4e7a-firebase-adminsdk-fbsvc-da2b0ce557.json'
 
                     sh 'chmod +x ./gradlew' 
                     sh './gradlew build -x test'
