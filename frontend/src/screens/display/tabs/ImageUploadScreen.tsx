@@ -17,16 +17,21 @@ import {
   useRegisterMedia,
   MediaUploadRequest,
 } from '@/api/media';
+import { useUpdateDeviceMedia } from '@/api/device'; // 1. 디바이스 미디어 업데이트 훅 import
 import { useQueryClient } from '@tanstack/react-query';
+import { useDeviceStore } from '@/stores/deviceStore'; // 2. 디바이스 스토어 import
 
 function ImageUploadScreen() {
   const [imageName, setImageName] = useState('');
   const [selectedImage, setSelectedImage] = useState<Asset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // 3. 스토어와 훅 초기화
   const queryClient = useQueryClient();
+  const selectedDeviceId = useDeviceStore(state => state.selectedDeviceId);
   const requestUrlMutation = useRequestMediaUploadUrl();
   const registerMediaMutation = useRegisterMedia();
+  const updateDeviceMediaMutation = useUpdateDeviceMedia();
 
   const handleChoosePhoto = () => {
     launchImageLibrary({ mediaType: 'photo' }, (response: ImagePickerResponse) => {
@@ -46,6 +51,12 @@ function ImageUploadScreen() {
   const handleUpload = async () => {
     if (!selectedImage || !selectedImage.uri || !selectedImage.fileName || !selectedImage.type) {
       Alert.alert('오류', '이미지 정보가 올바르지 않습니다.');
+      return;
+    }
+    
+    // 4. 디바이스 선택 여부 확인
+    if (!selectedDeviceId) {
+      Alert.alert('오류', '디바이스가 선택되지 않았습니다. 메인 화면에서 디바이스를 선택해주세요.');
       return;
     }
 
@@ -94,6 +105,8 @@ function ImageUploadScreen() {
         s3ObjectKey: s3ObjectKey,
         fileName: imageName,
         fileType: 'IMAGE' as const, // 'IMAGE' 타입을 명확히 해줍니다.
+        originType: 'ORIGINAL' as const, // 이 필드를 추가하세요.
+        deviceId: selectedDeviceId, // 이 필드를 추가하세요.
         fileSize: selectedImage.fileSize || 0,
         resolution:
           selectedImage.width && selectedImage.height
@@ -108,8 +121,24 @@ function ImageUploadScreen() {
       // 등록 성공 후 백엔드로부터 받은 응답을 콘솔에 출력합니다.
       console.log('7. 미디어 등록 성공:', registerResponse);
 
-      Alert.alert('성공', '이미지가 성공적으로 등록되었습니다.');
-      queryClient.invalidateQueries({ queryKey: ['myMedia'] }); // 보관함 목록 갱신
+      // 5. 원본 미디어를 먼저 디바이스에 적용합니다.
+      // AI가 생성하는 추가 미디어(객체 제거, 무드 이미지 등)는 비동기 처리 후 별도 알림을 통해 업데이트 됩니다.
+      console.log(`8. 디바이스(${selectedDeviceId})에 원본 미디어(${registerResponse.mediaId}) 적용 시작...`);
+      await updateDeviceMediaMutation.mutateAsync({
+        deviceId: selectedDeviceId,
+        data: { mediaId: registerResponse.mediaId },
+      });
+      console.log('9. 디바이스에 원본 미디어 적용 성공');
+
+      Alert.alert(
+        '등록 요청 완료', 
+        '이미지가 성공적으로 접수되었습니다. AI 분석이 완료되면 홈 화면에서 추가 기능을 사용할 수 있습니다.'
+      );
+      
+      // 홈 화면 캐시와 보관함 캐시를 갱신합니다.
+      queryClient.invalidateQueries({ queryKey: ['device', selectedDeviceId] }); 
+      queryClient.invalidateQueries({ queryKey: ['myMedia'] });
+      
       // 초기화
       setImageName('');
       setSelectedImage(null);
@@ -172,7 +201,7 @@ function ImageUploadScreen() {
 
       <View style={styles.infoBox}>
         <Text style={styles.infoText}>
-          💡 이미지를 등록하면 자동으로 AI가 배경 생성과 동영상 생성을 진행합니다. 완료되면 "보관" 탭에서 확인할 수 있습니다.
+          💡 이미지를 등록하면 SMARTWINDOW에 적용되고, 홈화면에서 확인할 수 있습니다.
         </Text>
       </View>
     </ScrollView>

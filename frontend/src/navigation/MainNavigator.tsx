@@ -1,28 +1,28 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import MainScreen from '@/screens/MainScreen';
-import HomeScreen from '@/screens/home/HomeScreen';
-import DeviceControlScreen from '@/screens/device/DeviceControlScreen'; // 1. 제어 화면 import
+import MainScreen from '@/screens/main/MainScreen';
+import DeviceRegisterScreen from '@/screens/main/DeviceRegisterScreen';
+import BottomTabNavigator from './BottomTabNavigator';
+import MyPageScreen from '@/screens/mypage/MyPageScreen'; // MyPageScreen import는 유지합니다.
 
+// MyPage를 스택 리스트에 추가합니다.
 export type MainStackParamList = {
   Main: undefined;
-  Home: { deviceId: string; deviceName: string };
-  DeviceControl: { deviceId: string }; // 2. 제어 화면 타입 추가
+  DeviceRegister: undefined;
+  BottomTabs: { deviceId: number };
+  MyPage: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 function MainNavigator() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-      {/* 3. 제어 화면을 스택에 추가 */}
-      <Stack.Screen
-        name="DeviceControl"
-        component={DeviceControlScreen}
-        options={{ headerShown: false }}
-      />
+    // 네비게이터의 기본 헤더는 사용하지 않도록 설정합니다.
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Main" component={MainScreen} />
+      <Stack.Screen name="DeviceRegister" component={DeviceRegisterScreen} />
+      <Stack.Screen name="BottomTabs" component={BottomTabNavigator} />
+      <Stack.Screen name="MyPage" component={MyPageScreen} />
     </Stack.Navigator>
   );
 }

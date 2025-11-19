@@ -14,7 +14,17 @@ export interface ApiResponse<T> {
 // ============================================================================
 
 // backend의 MediaOrigin Enum에 해당
-export type MediaOrigin = 'ORIGINAL' | 'AI_GENERATED';
+export type MediaOrigin =
+  | 'ORIGINAL'
+  | 'AI_RP'
+  | 'AI_SUNSET'
+  | 'AI_DAWN'
+  | 'AI_AFTERNOON'
+  | 'AI_NIGHT'
+  | 'AI_RP_SUNSET'
+  | 'AI_RP_DAWN'
+  | 'AI_RP_AFTERNOON'
+  | 'AI_RP_NIGHT';
 
 // backend의 MediaType Enum에 해당
 export type MediaType = 'IMAGE' | 'VIDEO';
@@ -49,6 +59,8 @@ export interface MediaRegisterRequest {
   s3ObjectKey: string;
   fileName: string;
   fileType: MediaType;
+  originType: MediaOrigin;
+  deviceId: number; // 이 필드를 추가하세요.
   fileSize: number;
   resolution: string | null;
 }
@@ -139,11 +151,11 @@ const getMediaDetail = async (mediaId: number): Promise<MediaResponse> => {
   return response as unknown as MediaResponse;
 };
 
-export const useGetMediaDetail = (mediaId: number) => {
+export const useGetMediaDetail = (mediaId?: number | null) => { // mediaId가 optional
   return useQuery({
     queryKey: ['mediaDetail', mediaId],
-    queryFn: () => getMediaDetail(mediaId),
-    enabled: !!mediaId, // mediaId가 있을 때만 쿼리를 실행합니다.
+    queryFn: () => getMediaDetail(mediaId!), // non-null assertion
+    enabled: !!mediaId, // mediaId가 truthy일 때만 실행
   });
 };
 
@@ -157,7 +169,7 @@ const updateMediaName = async ({
   mediaId,
   fileName,
 }: UpdateMediaNameRequest): Promise<MediaResponse> => {
-  const response = await apiClient.put<BackendSuccessResponse<MediaResponse>>(
+  const response = await apiClient.patch<BackendSuccessResponse<MediaResponse>>(
     `/media/${mediaId}/name`,
     { fileName },
   );
