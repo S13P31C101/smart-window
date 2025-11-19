@@ -94,7 +94,7 @@ public class DeviceController {
         return ApiResponse.onSuccess(response);
     }
 
-    @PatchMapping("/{device-id}/opcaity")
+    @PatchMapping("/{device-id}/opacity")
     public ApiResponse<DeviceStatusResponse> controlOpacity(@AuthenticationPrincipal Long userId,
                                                             @PathVariable("device-id") Long deviceId,
                                                             @RequestBody DeviceStatusRequest request) {
