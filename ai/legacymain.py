@@ -6,7 +6,6 @@ import time
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
-import concurrent.futures
 import utils
 
 load_dotenv()
@@ -19,10 +18,6 @@ task_results = {}
 
 # 음악 실행 중 여부 flag
 music_in_progress = False
-
-# CPU 코어수에 맞추기 (4~8, 실제 머신에 따라 적당히 조정)
-MAX_WORKERS = min(4, os.cpu_count() or 1)
-process_pool = concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS)
 
 app = FastAPI()
 
@@ -103,9 +98,8 @@ async def process_music_request(request):
     request['image_bytes'] = image_bytes
 
     loop = asyncio.get_running_loop()
-    # 반드시 동기 함수이어야 함 (ProcessPool에서만 돌 수 있게)
     caption = await loop.run_in_executor(
-        process_pool, utils.extract_mood_caption, image_bytes
+        None, utils.extract_mood_caption, image_bytes
     )
     print(f"[PROCESS_MUSIC] Caption: {caption}")
 
@@ -126,13 +120,13 @@ async def process_main_request(task_type, req):
     loop = asyncio.get_running_loop()
     if task_type == 'remove-person':
         print(f"[PROCESS_MAIN] Start remove-person")
-        result = await loop.run_in_executor(process_pool, utils.handle_remove_person, req)
+        result = await loop.run_in_executor(None, utils.handle_remove_person, req)
     elif task_type == 'scene-blend':
         print(f"[PROCESS_MAIN] Start scene-blend")
-        result = await loop.run_in_executor(process_pool, utils.handle_scene_blend, req)
+        result = await utils.handle_scene_blend(req)
     elif task_type == 'generate-dalle-image':
         print(f"[PROCESS_MAIN] Start generate-dalle-image")
-        result = await utils.handle_generate_dalle_image(req)  # 이건 반드시 async라면 pool 미사용
+        result = await utils.handle_generate_dalle_image(req)
     else:
         print(f"[PROCESS_MAIN][ERROR] Unknown task type: {task_type}")
         result = {"success": False, "error": "Unknown task type"}
@@ -143,14 +137,7 @@ async def process_main_request(task_type, req):
 @app.post("/api/v1/ai/remove-person1")
 async def remove_person_and_upload(request: dict = Body(...)):
     print(f"[QUEUE INPUT] remove-person request: {json.dumps(request, indent=2)}")
-    global music_in_progress
-    delay_count = 0
-    # 음악 진행 중이면 최대 2초까지 대기(0.1초씩)
-    while music_in_progress and delay_count < 20:
-        print("[QUEUE INPUT] Waiting for music to finish before enqueue main...")
-        await asyncio.sleep(0.1)
-        delay_count += 1
-    await asyncio.sleep(1)  # 기존 정책과 합치기
+    await asyncio.sleep(1)
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
@@ -165,12 +152,6 @@ async def remove_person_and_upload(request: dict = Body(...)):
 @app.post("/api/v1/ai/scene-blend1")
 async def scene_blend(request: dict = Body(...)):
     print(f"[QUEUE INPUT] scene-blend request: {json.dumps(request, indent=2)}")
-    global music_in_progress
-    delay_count = 0
-    while music_in_progress and delay_count < 20:
-        print("[QUEUE INPUT] Waiting for music to finish before enqueue main...")
-        await asyncio.sleep(0.1)
-        delay_count += 1
     await asyncio.sleep(1)
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
