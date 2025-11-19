@@ -11,27 +11,32 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Configuration
 public class FcmConfig {
 
-    @Value("${fcm.key.path}")
+//    @Value("${fcm.key.path}")
+    @Value("${fcm.key.content}")
     private String fcmKeyPath;
 
     private FirebaseApp firebaseApp;
 
     @Bean
     public FirebaseApp firebaseApp() throws Exception {
-        ClassPathResource resource = new ClassPathResource(fcmKeyPath);
+//        ClassPathResource resource = new ClassPathResource(fcmKeyPath);
+//
+//        if (!resource.exists()) {
+//            throw new IOException("Can't Find Key" + fcmKeyPath);
+//        }
 
-        if (!resource.exists()) {
-            throw new IOException("Can't Find Key" + fcmKeyPath);
-        }
+//        InputStream serviceAccount = resource.getInputStream();
 
-        InputStream serviceAccount = resource.getInputStream();
+        InputStream serviceAccount = new ByteArrayInputStream(fcmKeyPath.getBytes(StandardCharsets.UTF_8));
 
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
