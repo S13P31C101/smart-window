@@ -1,5 +1,8 @@
 package com.lumiscape.smartwindow.device.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
@@ -45,6 +48,8 @@ public class DeviceService {
 
     private MediaService mediaService;
     private MusicService musicService;
+
+    private final ObjectMapper objectMapper;
 
     @Autowired
     public void setMediaService(@Lazy MediaService mediaService) {
@@ -232,36 +237,51 @@ public class DeviceService {
 
         Device device = findByDeviceUniqueId(deviceUniqueId);
 
-        switch (statusType) {
-            case "power":
-                boolean power = Boolean.parseBoolean(payload);
-                device.updatePower(power);
-                // TODO FCM
-                fcmNotificationService.sendNotification(device.getUser().getId(),
-                        "전원",
-                        device.getDeviceName() + (power ? " 의 전원이 켜졌습니다." : " 의 전원이 꺼졌습니다."));
-                break;
-            case "open":
-                boolean open = Boolean.parseBoolean(payload);
-                device.updateOpen(open);
-                // TODO FCM
-                fcmNotificationService.sendNotification(device.getUser().getId(),
-                        "개폐",
-                        device.getDeviceName() + (open ? " 이 열렸습니다." : " 이 닫혔습니다."));
-                break;
-            case "mode":
-                DeviceMode mode = DeviceMode.valueOf(payload);
-                device.updateMode(mode);
-                fcmNotificationService.sendNotification(device.getUser().getId(),
-                        "모드",
-                        device.getDeviceName() + " 가 " + mode + " 입니다.");
-            case "sensor":
-                // TODO FCM
-                fcmNotificationService.sendNotification(device.getUser().getId(),
-                        "센서",
-                        payload);
-                break;
+        try {
+            switch (statusType) {
+                case "power":
+                    JsonNode jsonPower = objectMapper.readTree(payload);
+                    boolean power = jsonPower.get("status").asBoolean();
+
+                    device.updatePower(power);
+                    // TODO FCM
+                    fcmNotificationService.sendNotification(device.getUser().getId(),
+                            "전원",
+                            device.getDeviceName() + (power ? " 의 전원이 켜졌습니다." : " 의 전원이 꺼졌습니다."));
+                    break;
+                case "open":
+                    JsonNode jsonOpen = objectMapper.readTree(payload);
+                    boolean open = jsonOpen.get("status").asBoolean();
+
+                    device.updateOpen(open);
+                    // TODO FCM
+                    fcmNotificationService.sendNotification(device.getUser().getId(),
+                            "개폐",
+                            device.getDeviceName() + (open ? " 이 열렸습니다." : " 이 닫혔습니다."));
+                    break;
+                case "mode":
+                    JsonNode modeJson = objectMapper.readTree(payload);
+                    String modeStr = modeJson.get("status").asText();
+                    DeviceMode mode = DeviceMode.valueOf(modeStr);
+
+                    device.updateMode(mode);
+                    // TODO FCM
+                    fcmNotificationService.sendNotification(device.getUser().getId(),
+                            "모드",
+                            device.getDeviceName() + " 가 " + mode + " 입니다.");
+                case "sensor":
+                    // TODO FCM
+                    fcmNotificationService.sendNotification(device.getUser().getId(),
+                            "센서",
+                            payload);
+                    break;
+            }
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parsing, Payload : {}", payload, e);
+
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
+
     }
 
     @Transactional(readOnly = true)

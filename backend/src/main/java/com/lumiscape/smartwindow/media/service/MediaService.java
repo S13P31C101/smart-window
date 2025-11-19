@@ -168,6 +168,7 @@ public class MediaService {
                 .build();
 
         mediaRepository.save(aiMedia);
+        log.info("[ AI ] Gen AI image save. FileName : {}, Type : {}", aiFileName, type);
 
         // TODO FCM Push
         fcmNotificationService.sendNotification(parentMedia.getUser().getId(), " New AI ", " " + parentMedia.getFileName() + " 의 " + type + " 감성을 살린 AI 이미지가 생성되었습니다.");
