@@ -36,7 +36,6 @@ find_package(Qt6 6.9 REQUIRED COMPONENTS
     Multimedia
     Svg
     WebChannel
-    WebEngineQuick
     SerialPort
     Concurrent
 )
@@ -235,7 +234,6 @@ target_link_libraries(Lumiscape PRIVATE
     Qt6::Multimedia
     Qt6::Svg
     Qt6::WebChannel
-    Qt6::WebEngineQuick
     Qt6::SerialPort
     Qt6::Concurrent
 )
