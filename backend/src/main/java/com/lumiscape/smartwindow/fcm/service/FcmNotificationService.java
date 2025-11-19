@@ -44,7 +44,7 @@ public class FcmNotificationService {
 
                 log.info("[ FCM ] Send message Success, user : {}, {}", userId, response);
             } catch (FirebaseMessagingException e) {
-                log.error("[ FCM ] Failed to send message, user : {}, token : {}", userId, token);
+                log.error("[ FCM ] Failed to send message, user : {}, token : {}", userId, token, e);
             }
         }
 
