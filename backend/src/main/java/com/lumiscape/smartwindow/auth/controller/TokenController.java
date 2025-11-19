@@ -3,8 +3,6 @@ package com.lumiscape.smartwindow.auth.controller;
 import com.lumiscape.smartwindow.auth.dto.TokenReissueRequest;
 import com.lumiscape.smartwindow.auth.dto.TokenResponse;
 import com.lumiscape.smartwindow.auth.service.AuthService;
-import com.lumiscape.smartwindow.fcm.dto.FcmTokenRequest;
-import com.lumiscape.smartwindow.fcm.service.FcmService;
 import com.lumiscape.smartwindow.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class TokenController {
 
     private final AuthService authService;
-    private final FcmService fcmService;
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long userId) {
@@ -33,11 +30,5 @@ public class TokenController {
     public ResponseEntity<ApiResponse<TokenResponse>> reissue(@RequestBody TokenReissueRequest request) {
         TokenResponse tokenResponse = authService.reissue(request);
         return ResponseEntity.ok(ApiResponse.onSuccess(HttpStatus.OK, tokenResponse));
-    }
-
-    @PostMapping("/mobile")
-    public ResponseEntity<ApiResponse<Void>> registerFcmToken(@AuthenticationPrincipal Long userId, @RequestBody FcmTokenRequest request) {
-        fcmService.registerFcmToken(userId, request);
-        return ResponseEntity.ok(ApiResponse.onSuccess(HttpStatus.OK, null));
     }
 }
