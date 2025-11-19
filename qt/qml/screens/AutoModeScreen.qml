@@ -180,10 +180,19 @@ Item {
 
         // 실제 존재하는 비디오 파일 목록
         // 비디오를 추가하면 여기에 조건 추가
+        if (folderName === "uyuni" && currentTimeOfDay === "morning") {
+            return true
+        }
         if (folderName === "uyuni" && currentTimeOfDay === "daytime") {
             return true
         }
-
+        if (folderName === "maple" && currentTimeOfDay === "morning") {
+            return true
+        }
+        if (folderName === "maple" && currentTimeOfDay === "daytime") {
+            return true
+        }
+        
         // 예시: 다른 비디오를 추가하려면 아래와 같이 추가
         // if (folderName === "mapleworld" && currentTimeOfDay === "morning") return true
         // if (folderName === "paris" && currentTimeOfDay === "night") return true
