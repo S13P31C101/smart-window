@@ -4,6 +4,7 @@ import com.lumiscape.smartwindow.device.domain.Device;
 import com.lumiscape.smartwindow.device.domain.DeviceMode;
 import com.lumiscape.smartwindow.device.dto.*;
 import com.lumiscape.smartwindow.device.repository.DeviceRepository;
+import com.lumiscape.smartwindow.fcm.service.FcmNotificationService;
 import com.lumiscape.smartwindow.global.exception.CustomException;
 import com.lumiscape.smartwindow.global.exception.ErrorCode;
 import com.lumiscape.smartwindow.global.infra.MqttPublishService;
@@ -39,6 +40,8 @@ public class DeviceService {
     private final UserService userService;
     private final S3Service s3Service;
     private final MqttPublishService mqttPublishService;
+
+    private final FcmNotificationService fcmNotificationService;
 
     private MediaService mediaService;
     private MusicService musicService;
@@ -172,7 +175,6 @@ public class DeviceService {
         mqttPublishService.publishCommand(device.getDeviceUniqueId(), "widgets", newSettings);
 
         device.updateModeSettings(newSettings);
-        log.info(newSettings.toString());
 
         return DeviceModeSettingsResponse.from(device);
     }
@@ -235,6 +237,7 @@ public class DeviceService {
                 boolean power = Boolean.parseBoolean(payload);
                 device.updatePower(power);
                 // TODO FCM
+//                fcmNotificationService.sendNotificationToUser();
                 break;
             case "open":
                 boolean open = Boolean.parseBoolean(payload);
