@@ -140,7 +140,7 @@ async def process_main_request(task_type, req):
 
 # --- API ---
 
-@app.post("/api/v1/ai/remove-person")
+@app.post("/api/v1/ai/remove-person1")
 async def remove_person_and_upload(request: dict = Body(...)):
     print(f"[QUEUE INPUT] remove-person request: {json.dumps(request, indent=2)}")
     global music_in_progress
@@ -162,7 +162,7 @@ async def remove_person_and_upload(request: dict = Body(...)):
     await main_queue.put((task_id, "remove-person", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
-@app.post("/api/v1/ai/scene-blend")
+@app.post("/api/v1/ai/scene-blend1")
 async def scene_blend(request: dict = Body(...)):
     print(f"[QUEUE INPUT] scene-blend request: {json.dumps(request, indent=2)}")
     global music_in_progress
