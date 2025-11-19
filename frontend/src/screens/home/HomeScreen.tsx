@@ -67,6 +67,7 @@ function HomeScreen() {
     data: deviceDetail,
     isLoading: isDeviceDetailLoading,
     error: deviceDetailError,
+    refetch: refetchDeviceDetail, // useGetDeviceDetail에서 refetch 함수를 가져옵니다.
   } = useGetDeviceDetail(deviceId);
   
   const { data: myMedia } = useGetMyMedia();
@@ -74,7 +75,7 @@ function HomeScreen() {
   const { mutate: updatePower } = useUpdatePowerStatus();
   const { mutate: updateMode } = useUpdateDeviceMode();
   const { mutate: updateMedia } = useUpdateDeviceMedia();
-  const { mutate: updateOpacity } = useUpdateDeviceOpacity(); // 훅 다시 추가
+  const { mutate: updateOpacity } = useUpdateDeviceOpacity(refetchDeviceDetail); // 훅 다시 추가
   const { openPercentage: liveOpenPercentage } = useDeviceStore(); 
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -236,15 +237,16 @@ function HomeScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.controlCard}
-            onPress={handleToggleOpacity} // onPress 이벤트 핸들러 추가
-            disabled={!deviceDetail.powerStatus} // 전원이 꺼져있으면 비활성화
-          >
+            style={[
+              styles.controlCard,
+              !deviceDetail.powerStatus && styles.disabledCard,
+            ]}
+            onPress={handleToggleOpacity}
+            disabled={!deviceDetail.powerStatus}>
             <MaterialCommunityIcon name="sun-wireless-outline" size={24} color="#E0E5EB" />
             <Text style={styles.controlCardTitle}>투명도</Text>
             <Text style={styles.controlCardValue}>
-              {/* deviceDetail.transparency 대신 deviceDetail.opacityStatus 사용 */}
-              {deviceDetail.opacityStatus ? '불투명' : '투명'}
+              {deviceDetail.opacityStatus ? '투명' : '불투명'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -420,6 +422,10 @@ const styles = StyleSheet.create({
     color: '#F1F5F9',
     fontSize: 14,
     fontWeight: '600',
+  },
+  disabledCard: {
+    opacity: 0.5,
+    backgroundColor: '#334155', // 비활성화된 카드의 색상
   },
 });
 
