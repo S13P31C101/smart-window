@@ -6,6 +6,7 @@ import time
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
+import concurrent.futures
 import utils
 
 load_dotenv()
@@ -16,16 +17,15 @@ music_queue = asyncio.Queue()
 main_queue = asyncio.Queue()
 task_results = {}
 
+# 음악 실행 중 여부 flag
+music_in_progress = False
+
+# CPU 코어수에 맞추기 (4~8, 실제 머신에 따라 적당히 조정)
+MAX_WORKERS = min(4, os.cpu_count() or 1)
+process_pool = concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS)
+
 app = FastAPI()
 
-@app.on_event("startup")
-async def startup_event():
-    print("[SYSTEM] Starting dedicated music and main workers...")
-    asyncio.create_task(music_worker())
-    asyncio.create_task(main_worker())
-    print("[SYSTEM] Both workers launched")
-
-# --- 보조 함수 ---
 async def download_image_bytes(download_url):
     print(f"[DOWNLOAD] >> download_image_bytes called ({download_url})")
     try:
@@ -50,82 +50,107 @@ async def download_image_bytes(download_url):
     finally:
         print("[DOWNLOAD] >> Download function finished (finally block)")
 
-# --- worker들 ---
-
-async def music_worker():
-    print("[WORKER-MUSIC] >>> Worker started")
-    wake_count = 0
+# --- 중앙 스케줄러 ---
+async def scheduler_worker():
+    global music_in_progress
+    print("[SCHEDULER] >>> Worker started")
     while True:
-        print(f"[WORKER-MUSIC] >>> Waiting for next music task... (queue size: {music_queue.qsize()})")
-        task_id, request = await music_queue.get()
-        wake_count += 1
-        print(f"[WORKER-MUSIC] >>> Got task {task_id} | wake_count={wake_count} | Time={time.strftime('%X')}")
-        try:
-            print(f"[WORKER-MUSIC] >>> Processing task_id={task_id}, request keys: {list(request.keys())}")
-            download_url = request.get("downloadUrl")
-            print(f"[WORKER-MUSIC] >>> Downloading image from: {download_url}")
-            # --- download diagnostic ---
-            image_bytes = await download_image_bytes(download_url)
-            if not image_bytes:
-                print(f"[WORKER-MUSIC][ERROR] Image download failed for task_id={task_id}")
-                task_results[task_id] = {"success": False, "error": "Image download failed (expired S3 link?)"}
-                music_queue.task_done()  # 반드시 호출!
-                continue
-            request['image_bytes'] = image_bytes
-            print(f"[WORKER-MUSIC] >>> Image download complete. Bytes: {len(image_bytes)}")
-            print(f"[WORKER-MUSIC] >>> Calling handle_recommend_music")
-            result = await utils.handle_recommend_music(request)
-            print(f"[WORKER-MUSIC] >>> handle_recommend_music finished. Result: {result}")
-            task_results[task_id] = result
-            if result.get("success"):
-                print(f"[WORKER-MUSIC] >>> MUSIC COMPLETE: YouTube Found → {result.get('youtube_url')}")
+        # 음악 큐/작업 진행 중이면 무조건 음악만!
+        if not music_queue.empty() or music_in_progress:
+            if not music_queue.empty() and not music_in_progress:
+                task_id, request = await music_queue.get()
+                print(f"[SCHEDULER] >>> Got MUSIC task {task_id} | Time={time.strftime('%X')}")
+                music_in_progress = True
+                try:
+                    result = await process_music_request(request)
+                    task_results[task_id] = result
+                except Exception as e:
+                    print(f"[SCHEDULER][ERROR] music: {e}")
+                    task_results[task_id] = {"success": False, "error": str(e)}
+                finally:
+                    music_queue.task_done()
+                    music_in_progress = False
             else:
-                print(f"[WORKER-MUSIC][ERROR] MUSIC FAIL/NO MATCH. msg:{result.get('message')}, err:{result.get('error')}")
-            print(f"[WORKER-MUSIC] >>> Done: task_id={task_id} Success={result.get('success')}")
-        except Exception as e:
-            print(f"[WORKER-MUSIC][EXCEPTION] {task_id} Exception: {e}")
-            task_results[task_id] = {"success": False, "error": str(e)}
-        finally:
-            print(f"[WORKER-MUSIC] >>> task_done for {task_id}, queue size now: {music_queue.qsize()}")
-            music_queue.task_done()
+                # music 처리 중 -> main 대기
+                await asyncio.sleep(0.05)
+        elif not main_queue.empty():
+            task_id, task_type, req = await main_queue.get()
+            print(f"[SCHEDULER] >>> Got MAIN task {task_id} ({task_type}) | Time={time.strftime('%X')}")
+            try:
+                result = await process_main_request(task_type, req)
+                task_results[task_id] = result
+            except Exception as e:
+                print(f"[SCHEDULER][ERROR] main: {e}")
+                task_results[task_id] = {"success": False, "error": str(e)}
+            finally:
+                main_queue.task_done()
+        else:
+            await asyncio.sleep(0.1)
 
-async def main_worker():
-    print("[WORKER-MAIN] >>> Worker started")
-    wake_count = 0
-    while True:
-        print(f"[WORKER-MAIN] >>> Waiting for next main task... (queue size: {main_queue.qsize()})")
-        task_id, task_type, req = await main_queue.get()
-        wake_count += 1
-        print(f"[WORKER-MAIN] >>> Got task {task_id} ({task_type}) | wake_count={wake_count} | Time={time.strftime('%X')}")
-        try:
-            print(f"[WORKER-MAIN] >>> Processing task_id={task_id}, request keys: {list(req.keys())}")
-            if task_type == 'remove-person':
-                loop = asyncio.get_event_loop()
-                print(f"[WORKER-MAIN] >>> Start remove-person")
-                result = await loop.run_in_executor(None, utils.handle_remove_person, req)
-            elif task_type == 'scene-blend':
-                print(f"[WORKER-MAIN] >>> Start scene-blend")
-                result = await utils.handle_scene_blend(req)
-            elif task_type == 'generate-dalle-image':
-                print(f"[WORKER-MAIN] >>> Start generate-dalle-image")
-                result = await utils.handle_generate_dalle_image(req)
-            else:
-                print(f"[WORKER-MAIN][ERROR] Unknown task type: {task_type}")
-                result = {"success": False, "error": "Unknown task type"}
-            task_results[task_id] = result
-            print(f"[WORKER-MAIN] >>> Done: task_id={task_id}, Success={result.get('success')}")
-        except Exception as e:
-            print(f"[WORKER-MAIN][EXCEPTION] {task_id} Exception: {e}")
-            task_results[task_id] = {"success": False, "error": str(e)}
-        finally:
-            print(f"[WORKER-MAIN] >>> task_done for {task_id}, queue size now: {main_queue.qsize()}")
-            main_queue.task_done()
+@app.on_event("startup")
+async def startup_event():
+    print("[SYSTEM] Scheduler with music-priority!")
+    asyncio.create_task(scheduler_worker())
+
+# --- 작업별 처리 함수 ---
+
+async def process_music_request(request):
+    download_url = request.get("downloadUrl")
+    print(f"[PROCESS_MUSIC] Downloading image for music from: {download_url}")
+    image_bytes = await download_image_bytes(download_url)
+    if not image_bytes:
+        return {"success": False, "error": "Image download failed"}
+    request['image_bytes'] = image_bytes
+
+    loop = asyncio.get_running_loop()
+    # 반드시 동기 함수이어야 함 (ProcessPool에서만 돌 수 있게)
+    caption = await loop.run_in_executor(
+        process_pool, utils.extract_mood_caption, image_bytes
+    )
+    print(f"[PROCESS_MUSIC] Caption: {caption}")
+
+    query = f"{caption} piano music"
+    result = await utils.search_youtube_music(query)
+    if result:
+        music_url = result["url"]
+        await utils.notify_music_callback(
+            request["mediaId"],
+            str(request.get("deviceId", request.get("targetAIS3Key"))),
+            music_url
+        )
+        return {"success": True, "message": f"Found song '{result['title']}'", "youtube_url": music_url, "mood_caption": caption}
+    else:
+        return {"success": False, "message": "No matching music found.", "mood_caption": caption}
+
+async def process_main_request(task_type, req):
+    loop = asyncio.get_running_loop()
+    if task_type == 'remove-person':
+        print(f"[PROCESS_MAIN] Start remove-person")
+        result = await loop.run_in_executor(process_pool, utils.handle_remove_person, req)
+    elif task_type == 'scene-blend':
+        print(f"[PROCESS_MAIN] Start scene-blend")
+        result = await loop.run_in_executor(process_pool, utils.handle_scene_blend, req)
+    elif task_type == 'generate-dalle-image':
+        print(f"[PROCESS_MAIN] Start generate-dalle-image")
+        result = await utils.handle_generate_dalle_image(req)  # 이건 반드시 async라면 pool 미사용
+    else:
+        print(f"[PROCESS_MAIN][ERROR] Unknown task type: {task_type}")
+        result = {"success": False, "error": "Unknown task type"}
+    return result
 
 # --- API ---
 
 @app.post("/api/v1/ai/remove-person")
 async def remove_person_and_upload(request: dict = Body(...)):
-    print(f"[QUEUE INPUT] remove-person request (pre-download put): {json.dumps(request, indent=2)}")
+    print(f"[QUEUE INPUT] remove-person request: {json.dumps(request, indent=2)}")
+    global music_in_progress
+    delay_count = 0
+    # 음악 진행 중이면 최대 2초까지 대기(0.1초씩)
+    while music_in_progress and delay_count < 20:
+        print("[QUEUE INPUT] Waiting for music to finish before enqueue main...")
+        await asyncio.sleep(0.1)
+        delay_count += 1
+    await asyncio.sleep(1)  # 기존 정책과 합치기
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
@@ -137,17 +162,16 @@ async def remove_person_and_upload(request: dict = Body(...)):
     await main_queue.put((task_id, "remove-person", request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
-@app.post("/api/v1/ai/recommend-music")
-async def recommend_music(request: dict = Body(...)):
-    print(f"[QUEUE INPUT] recommend-music request (pre-download put): {json.dumps(request, indent=2)}")
-    task_id = str(uuid.uuid4())
-    print(f"[QUEUE INPUT] Putting to music_queue (recommend-music) task_id={task_id}")
-    await music_queue.put((task_id, request))
-    return JSONResponse(content={"success": True, "task_id": task_id})
-
 @app.post("/api/v1/ai/scene-blend")
 async def scene_blend(request: dict = Body(...)):
-    print(f"[QUEUE INPUT] scene-blend request (pre-download put): {json.dumps(request, indent=2)}")
+    print(f"[QUEUE INPUT] scene-blend request: {json.dumps(request, indent=2)}")
+    global music_in_progress
+    delay_count = 0
+    while music_in_progress and delay_count < 20:
+        print("[QUEUE INPUT] Waiting for music to finish before enqueue main...")
+        await asyncio.sleep(0.1)
+        delay_count += 1
+    await asyncio.sleep(1)
     download_url = request.get("downloadUrl")
     image_bytes = await download_image_bytes(download_url)
     if not image_bytes:
@@ -157,6 +181,14 @@ async def scene_blend(request: dict = Body(...)):
     task_id = str(uuid.uuid4())
     print(f"[QUEUE INPUT] Putting to main_queue (scene-blend) task_id={task_id}")
     await main_queue.put((task_id, "scene-blend", request))
+    return JSONResponse(content={"success": True, "task_id": task_id})
+
+@app.post("/api/v1/ai/recommend-music")
+async def recommend_music(request: dict = Body(...)):
+    print(f"[QUEUE INPUT] recommend-music request: {json.dumps(request, indent=2)}")
+    task_id = str(uuid.uuid4())
+    print(f"[QUEUE INPUT] Putting to music_queue (recommend-music) task_id={task_id}")
+    await music_queue.put((task_id, request))
     return JSONResponse(content={"success": True, "task_id": task_id})
 
 @app.post("/api/v1/ai/generate-dalle-image")

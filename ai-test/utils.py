@@ -104,6 +104,7 @@ async def notify_music_callback(media_id: int, device_id: str, music_url: str):
     import json
     print(f"[MUSIC CALLBACK] --- Preparing callback ---")
     print(f"[MUSIC CALLBACK] Target URL: {AI_MUSIC_CALLBACK_URL}")
+    headers = {"X-AI-Token": AI_TOKEN}
 
     payload = {
         "mediaId": int(media_id),      # 반드시 int
@@ -115,7 +116,7 @@ async def notify_music_callback(media_id: int, device_id: str, music_url: str):
 
     timeout = httpx.Timeout(30.0, read=30.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(AI_MUSIC_CALLBACK_URL, json=payload)
+        resp = await client.post(AI_MUSIC_CALLBACK_URL, json=payload,headers=headers)
         print(f"[MUSIC_CALLBACK] Status: {resp.status_code}")
         print(f"[MUSIC_CALLBACK] Body: {resp.text}")
         if resp.status_code not in (200, 201):
