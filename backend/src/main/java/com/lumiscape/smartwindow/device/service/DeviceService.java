@@ -269,6 +269,7 @@ public class DeviceService {
                     fcmNotificationService.sendNotification(device.getUser().getId(),
                             "모드",
                             device.getDeviceName() + " 가 " + mode + " 입니다.");
+                    break;
                 case "sensor":
                     // TODO FCM
                     fcmNotificationService.sendNotification(device.getUser().getId(),
