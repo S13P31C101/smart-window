@@ -18,11 +18,23 @@ SensorManager::SensorManager(QObject *parent) : QObject(parent)
     // --- 미세먼지 센서 설정 ---
     dustSerial = new QSerialPort(this);
     dustSerial->setPortName("/dev/ttyUSB1"); // 사용자 환경에 맞게 수정
-    // ... (이하 시리얼 설정)
+    dustSerial->setBaudRate(QSerialPort::Baud9600);
+    dustSerial->setDataBits(QSerialPort::Data8);
+    dustSerial->setParity(QSerialPort::NoParity);
+    dustSerial->setStopBits(QSerialPort::OneStop);
+    dustSerial->setFlowControl(QSerialPort::NoFlowControl);
+
     if (dustSerial->open(QIODevice::ReadOnly)) {
         connect(dustSerial, &QSerialPort::readyRead, this, &SensorManager::readDustData);
     } else {
         qWarning() << "Failed to open dust sensor port:" << dustSerial->errorString();
+        m_useDummyDust = true;
+        qWarning() << "Dust sensor unavailable, using dummy data (PM2.5: 15, PM10: 25)";
+        // 더미 값 설정: 양호한 실내 공기질
+        m_pm25 = 15.0;
+        m_pm10 = 25.0;
+        emit pm25Changed();
+        emit pm10Changed();
     }
 
     // --- 타이머 설정 ---
@@ -55,7 +67,20 @@ float SensorManager::humidity() const { return m_humidity; }
 void SensorManager::requestCo2Data()
 {
     if (!co2Serial->isOpen()) {
-        if (!co2Serial->open(QIODevice::ReadWrite)) return;
+        if (!co2Serial->open(QIODevice::ReadWrite)) {
+            // CO2 센서 연결 실패 - 더미 값 사용
+            if (!m_useDummyCo2) {
+                m_useDummyCo2 = true;
+                qWarning() << "CO2 sensor unavailable, using dummy data (400-800 ppm)";
+            }
+            // 더미 값: 실내 일반 CO2 농도 (400-800 ppm)
+            int dummy_co2 = 600;
+            if (m_co2 != dummy_co2) {
+                m_co2 = dummy_co2;
+                emit co2Changed();
+            }
+            return;
+        }
     }
     const char cmd[] = {(char)0xFF, (char)0x01, (char)0x86, 0x00, 0x00, 0x00, 0x00, 0x00, (char)0x79};
     co2Serial->write(QByteArray(cmd, 9));
@@ -115,16 +140,58 @@ void SensorManager::requestTempHumiData()
 {
     m_i2c_fd = open(I2C_BUS, O_RDWR);
     if (m_i2c_fd < 0) {
-        qWarning("Failed to open the i2c bus");
+        m_failureCount++;
+        // 3번 실패 후 더미 데이터 모드로 전환
+        if (m_failureCount >= 3 && !m_useDummyTempHumi) {
+            m_useDummyTempHumi = true;
+            qWarning() << "I2C bus unavailable after" << m_failureCount << "attempts, using dummy data (Temp: 22°C, Humidity: 45%)";
+        }
+
+        if (m_useDummyTempHumi) {
+            // 더미 값: 쾌적한 실내 환경 (온도 22°C, 습도 45%)
+            float dummy_temp = 22.0;
+            float dummy_humi = 45.0;
+
+            if (m_temperature != dummy_temp) {
+                m_temperature = dummy_temp;
+                emit temperatureChanged();
+            }
+            if (m_humidity != dummy_humi) {
+                m_humidity = dummy_humi;
+                emit humidityChanged();
+            }
+        }
         return;
     }
 
     if (ioctl(m_i2c_fd, I2C_SLAVE, SHTC3_ADDR) < 0) {
-        qWarning("Failed to acquire bus access to SHTC3.");
+        m_failureCount++;
+        qWarning() << "Failed to acquire bus access to SHTC3. Attempt:" << m_failureCount;
         close(m_i2c_fd);
         m_i2c_fd = -1;
+
+        // 3번 실패 후 더미 데이터 모드로 전환
+        if (m_failureCount >= 3 && !m_useDummyTempHumi) {
+            m_useDummyTempHumi = true;
+            qWarning() << "SHTC3 sensor unavailable, using dummy data";
+
+            float dummy_temp = 22.0;
+            float dummy_humi = 45.0;
+
+            if (m_temperature != dummy_temp) {
+                m_temperature = dummy_temp;
+                emit temperatureChanged();
+            }
+            if (m_humidity != dummy_humi) {
+                m_humidity = dummy_humi;
+                emit humidityChanged();
+            }
+        }
         return;
     }
+
+    // 연결 성공 - failure count 리셋
+    m_failureCount = 0;
 
     // 측정 명령어 전송
     unsigned char cmd[] = {0x78, 0x66};

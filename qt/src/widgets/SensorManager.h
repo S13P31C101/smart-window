@@ -66,6 +66,12 @@ private:
     float m_temperature = 0.0;
     float m_humidity = 0.0;
 
+    // Fallback flags for dummy data
+    bool m_useDummyCo2 = false;
+    bool m_useDummyDust = false;
+    bool m_useDummyTempHumi = false;
+    int m_failureCount = 0; // I2C 실패 카운트
+
     unsigned char crc8(const unsigned char *data, int len); // SHTC3용 CRC8
     unsigned char calculateCo2Checksum(const QByteArray &data);
 };
