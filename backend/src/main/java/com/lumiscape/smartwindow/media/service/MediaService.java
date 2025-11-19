@@ -170,7 +170,7 @@ public class MediaService {
         mediaRepository.save(aiMedia);
 
         // TODO FCM Push
-        fcmNotificationService.sendNotificationToUser(parentMedia.getUser(), " New AI ", " " + parentMedia.getFileName() + " 의 " + type + " 감성을 살린 AI 이미지가 생성되었습니다.");
+//        fcmNotificationService.sendNotificationToUser(parentMedia.getUser(), " New AI ", " " + parentMedia.getFileName() + " 의 " + type + " 감성을 살린 AI 이미지가 생성되었습니다.");
     }
 
     public Media findMediaByUser(Long mediaId, Long userId) {
