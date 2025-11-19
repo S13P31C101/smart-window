@@ -30,19 +30,37 @@ public class FcmNotificationService {
                 .map(Mobile::getToken)
                 .toList();
 
-        MulticastMessage message = MulticastMessage.builder()
-                .setNotification(Notification.builder()
-                        .setTitle(title)
-                        .setBody(body)
-                        .build())
-                .addAllTokens(tokens)
-                .build();
+        for (String token : tokens) {
+            Message message = Message.builder()
+                    .setToken(token)
+                    .setNotification(Notification.builder()
+                            .setTitle(title)
+                            .setBody(body)
+                            .build())
+                    .build();
 
-        try {
-            firebaseMessaging.sendEachForMulticast(message);
-            log.info("[ FCM ] Send message Success, user = {}", userId);
-        } catch (FirebaseMessagingException e) {
-            log.error("[ FCM ] Failed to send messages, user = {}", userId);
+            try {
+                String response = firebaseMessaging.send(message);
+
+                log.info("[ FCM ] Send message Success, user : {}, {}", userId, response);
+            } catch (FirebaseMessagingException e) {
+                log.error("[ FCM ] Failed to send message, user : {}, token : {}", userId, token);
+            }
         }
+
+//        MulticastMessage message = MulticastMessage.builder()
+//                .setNotification(Notification.builder()
+//                        .setTitle(title)
+//                        .setBody(body)
+//                        .build())
+//                .addAllTokens(tokens)
+//                .build();
+//
+//        try {
+//            firebaseMessaging.sendEachForMulticast(message);
+//            log.info("[ FCM ] Send message Success, user = {}", userId);
+//        } catch (FirebaseMessagingException e) {
+//            log.error("[ FCM ] Failed to send messages, user = {}", userId);
+//        }
     }
 }
