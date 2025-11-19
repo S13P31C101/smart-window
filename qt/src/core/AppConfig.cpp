@@ -123,6 +123,15 @@ void AppConfig::setCurrentYoutubeUrl(const QString &url)
     }
 }
 
+void AppConfig::setCustomModeYoutubeUrl(const QString &url)
+{
+    if (m_customModeYoutubeUrl != url) {
+        m_customModeYoutubeUrl = url;
+        emit customModeYoutubeUrlChanged();
+        qInfo() << "Custom Mode YouTube URL updated:" << url;
+    }
+}
+
 void AppConfig::setWidgetClock(bool enabled)
 {
     if (m_widgetClock != enabled) {

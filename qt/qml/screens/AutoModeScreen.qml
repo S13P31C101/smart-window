@@ -171,16 +171,39 @@ Item {
 
     // 장소별 비디오 존재 여부 확인
     function hasLocationVideo(location) {
-        // 현재는 default.mp4만 있으므로 모든 장소에 대해 false 반환
-        // 추후 장소별 비디오가 추가되면 이 함수 수정
+        if (!location || !currentTimeOfDay) {
+            return false
+        }
+
+        var folderName = location.display
+        var fileName = location.file
+
+        // 실제 존재하는 비디오 파일 목록
+        // 비디오를 추가하면 여기에 조건 추가
+        if (folderName === "uyuni" && currentTimeOfDay === "daytime") {
+            return true
+        }
+
+        // 예시: 다른 비디오를 추가하려면 아래와 같이 추가
+        // if (folderName === "mapleworld" && currentTimeOfDay === "morning") return true
+        // if (folderName === "paris" && currentTimeOfDay === "night") return true
+
         return false
     }
 
     // 비디오 경로 생성
     function getSceneVideo() {
-        // 현재는 default 비디오만 사용
-        var videoPath = "file://" + appConfig.applicationDirPath + "/assets/videos/scenes/default.mp4"
-        console.log("🎥 Loading video:", videoPath)
+        if (!currentLocation || !currentTimeOfDay) {
+            var defaultPath = "file://" + appConfig.applicationDirPath + "/assets/videos/scenes/default.mp4"
+            console.log("🎥 Loading default video:", defaultPath)
+            return defaultPath
+        }
+
+        var folderName = currentLocation.display
+        var fileName = currentLocation.file
+        var videoPath = "file://" + appConfig.applicationDirPath + "/assets/videos/scenes/" + folderName + "/" + currentTimeOfDay + "_" + fileName + ".mp4"
+
+        console.log("🎥 Attempting to load video:", videoPath)
         return videoPath
     }
 
@@ -223,7 +246,7 @@ Item {
         autoPlay: true
         loops: MediaPlayer.Infinite
         muted: true
-        playbackRate: 0.2
+        playbackRate: 0.7
 
         opacity: visible ? 1.0 : 0.0
         Behavior on opacity {

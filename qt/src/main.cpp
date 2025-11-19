@@ -89,6 +89,15 @@ int main(int argc, char *argv[])
         config.mqttUseTls()
     );
 
+    // Configure Router to publish mode status via MQTT
+    router.setMqttClient(&mqttClient, config.deviceUniqueId());
+
+    // ========================================================================
+    // YouTube Provider Setup (needed for MQTT music commands)
+    // ========================================================================
+
+    auto youtubeProvider = new YouTubeProvider(&app);
+
     // ========================================================================
     // Alarm Manager Setup
     // ========================================================================
@@ -138,7 +147,7 @@ int main(int argc, char *argv[])
 
     // Simple MQTT message handler for testing
     QObject::connect(&mqttClient, &MqttClient::jsonMessageReceived,
-                     [&config, &router, &mediaPipeClient, pdlcController, windowController, alarmManager](const QString &topic, const QVariantMap &data) {
+                     [&config, &router, &mediaPipeClient, pdlcController, windowController, alarmManager, youtubeProvider](const QString &topic, const QVariantMap &data) {
         qInfo() << "========================================";
         qInfo() << "MQTT Message Received!";
         qInfo() << "Topic:" << topic;
@@ -245,14 +254,14 @@ int main(int argc, char *argv[])
                     router.navigateTo("auto");
                     qInfo() << "  → Auto Mode: PDLC Opaque, navigating to 'auto' screen";
                 }
-                else if (mode == "DARK_MODE") {
+                else if (mode == "PRIVACY_MODE") {
                     // Privacy Mode: PDLC OFF (Opaque)
                     // Temporary mapping: DARK_MODE → Privacy
                     pdlcController->setOpaque();
                     router.navigateTo("privacy");
                     qInfo() << "  → Privacy Mode: PDLC Opaque, navigating to 'privacy' screen";
                 }
-                else if (mode == "SLEEP_MODE") {
+                else if (mode == "GLASS_MODE") {
                     // Glass Mode: PDLC ON (Transparent)
                     // Temporary mapping: SLEEP_MODE → Glass
                     pdlcController->setTransparent();
@@ -264,6 +273,11 @@ int main(int argc, char *argv[])
                     pdlcController->setOpaque();
                     router.navigateTo("custom");
                     qInfo() << "  → Custom Mode: PDLC Opaque, navigating to 'custom' screen";
+                }
+                else if (mode == "MENU_MODE"){
+                    pdlcController->setOpaque();
+                    router.navigateTo("menu");
+                    qInfo() << "  → Menu Screen: PDLC Opaque, navigating to 'menu' screen";
                 }
                 else {
                     qWarning() << "  → Unknown mode:" << mode;
@@ -283,15 +297,79 @@ int main(int argc, char *argv[])
             }
             else if (command == "music") {
                 qInfo() << ">>> Music command received!";
-                qInfo() << "    Music ID:" << data["musicId"].toLongLong();
-                QString musicUrl = data["musicUrl"].toString();
-                qInfo() << "    Music URL:" << musicUrl;
+                qInfo() << "    Raw data:" << data;
 
-                // Update current YouTube URL in config
-                config.setCurrentYoutubeUrl(musicUrl);
+                // Validate and parse music URL
+                if (!data.contains("musicUrl")) {
+                    qWarning() << "    ERROR: Missing 'musicUrl' field in music command";
+                    qWarning() << "    Available fields:" << data.keys();
+                    return;
+                }
+
+                QString musicUrl = data["musicUrl"].toString().trimmed();
+
+                // Handle empty or null URL - pause Custom Mode music only
+                if (musicUrl.isEmpty() || musicUrl == "null") {
+                    qInfo() << "    Empty or null music URL - pausing Custom Mode music";
+
+                    // Pause only if Custom Mode's music is currently playing
+                    QString currentCustomUrl = config.customModeYoutubeUrl();
+                    if (!currentCustomUrl.isEmpty() &&
+                        youtubeProvider->currentUrl() == currentCustomUrl &&
+                        youtubeProvider->isPlaying()) {
+                        youtubeProvider->pause();
+                        qInfo() << "    ⏸ Custom Mode music paused";
+                    }
+
+                    // Keep the widget visible but with paused state
+                    // Don't clear the URL so widget remains visible
+
+                    qInfo() << "    ✓ Music command processed (pause)";
+                    return;
+                }
+
+                qInfo() << "    Raw Music URL:" << musicUrl;
+
+                // Sanitize URL: remove quotes, playlist parameters, etc.
+                // Remove leading/trailing quotes
+                if (musicUrl.startsWith("\"")) musicUrl.remove(0, 1);
+                if (musicUrl.endsWith("\"")) musicUrl.chop(1);
+                if (musicUrl.startsWith("'")) musicUrl.remove(0, 1);
+                if (musicUrl.endsWith("'")) musicUrl.chop(1);
+
+                // Remove escaped quotes
+                musicUrl.replace("\\\"", "");
+                musicUrl.replace("\\'", "");
+
+                // Remove playlist parameters
+                if (musicUrl.contains("&list=")) {
+                    musicUrl = musicUrl.left(musicUrl.indexOf("&list="));
+                }
+                if (musicUrl.contains("&start_radio=")) {
+                    musicUrl = musicUrl.left(musicUrl.indexOf("&start_radio="));
+                }
+                if (musicUrl.contains("?list=")) {
+                    musicUrl = musicUrl.left(musicUrl.indexOf("?list="));
+                }
+
+                // Final trim
+                musicUrl = musicUrl.trimmed();
+
+                qInfo() << "    Music ID:" << data.value("musicId", "N/A");
+                qInfo() << "    Sanitized Music URL:" << musicUrl;
+
+                // Update Custom Mode YouTube URL in config
+                config.setCustomModeYoutubeUrl(musicUrl);
+
+                // Enable music widget if not already enabled
+                if (!config.widgetMusic()) {
+                    config.setWidgetMusic(true);
+                    qInfo() << "    Music widget auto-enabled";
+                }
 
                 // Auto navigate to custom mode to play the music
                 router.navigateTo("custom");
+                qInfo() << "    ✓ Music command processed successfully";
             }
             else if (command == "alarm") {
                 qInfo() << ">>> Alarm command received!";
@@ -378,7 +456,7 @@ int main(int argc, char *argv[])
     // auto spotifyProvider = new SpotifyProvider(&restClient, &app);
     // auto spotifyWebBridge = new SpotifyWebBridge(&app);
     // auto spotifyAuthHelper = new SpotifyAuthHelper(&restClient, &app);
-    auto youtubeProvider = new YouTubeProvider(&app);
+    // YouTubeProvider already created earlier (line 99) for MQTT music commands
 
     // Initialize WeatherProvider with API key and default city
     weatherProvider->setApiKey(config.weatherApiKey());

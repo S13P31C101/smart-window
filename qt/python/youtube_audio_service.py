@@ -57,6 +57,7 @@ class YouTubeAudioService:
                 'no_warnings': True,
                 'extract_flat': False,
                 'force_generic_extractor': False,
+                'noplaylist': True,  # Don't download playlists, only single video
             }
 
             # Add cookies if provided (for YouTube Premium/age-restricted content)
@@ -66,9 +67,12 @@ class YouTubeAudioService:
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 # Extract video info
+                self.log(f"Calling yt-dlp.extract_info()...")
                 info = ydl.extract_info(youtube_url, download=False)
+                self.log(f"yt-dlp.extract_info() completed")
 
                 if info is None:
+                    self.log(f"ERROR: extract_info() returned None")
                     return {
                         "success": False,
                         "error": "Failed to extract video information"
