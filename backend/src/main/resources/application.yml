@@ -114,6 +114,3 @@ spring:
 cors:
   allowed-origins: http://localhost:*,http://127.0.0.1:*,http://192.168.100.146:*,http://10.0.2.2:*,https://k13c101.p.ssafy.io
 
-# Firebase Cloud Messaging 설정
-fcm:
-  service-account-key-path: serviceAccountKey.json

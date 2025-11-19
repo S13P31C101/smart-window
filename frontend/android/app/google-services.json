@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "686105272758",
+    "project_id": "smartwindow-a4e7a",
+    "storage_bucket": "smartwindow-a4e7a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:686105272758:android:0eb7a5628b08a30f2f2117",
+        "android_client_info": {
+          "package_name": "com.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUpstGZ3qWKA6xxgMJHbVrKd2UJJ2103U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

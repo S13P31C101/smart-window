@@ -27,7 +27,7 @@ public record DeviceDetailResponse(
                 device.getDeviceName(),
                 device.isPowerStatus(),
                 device.isOpenStatus(),
-                device.isOpenStatus(),
+                device.isOpacityStatus(),
                 device.getModeStatus(),
                 device.getModeSettings(),
                 device.getMedia() != null ? device.getMedia().getId() : null,
