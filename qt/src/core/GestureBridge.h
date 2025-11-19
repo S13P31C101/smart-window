@@ -90,6 +90,10 @@ private:
     static constexpr qreal SMOOTHING_FACTOR = 0.3;
     static constexpr qreal SWIPE_THRESHOLD = 0.15;
 
+    // Coordinate mapping - adds margin to left/right edges
+    static constexpr qreal HORIZONTAL_MARGIN = 0.1;  // 10% margin on each side
+    static constexpr qreal VERTICAL_MARGIN = 0.05;   // 5% margin on top/bottom
+
     // Gesture timing
     qint64 m_lastGestureTime{0};
     static constexpr qint64 GESTURE_COOLDOWN_MS = 500;

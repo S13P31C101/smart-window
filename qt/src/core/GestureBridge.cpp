@@ -22,9 +22,18 @@ void GestureBridge::updateGesture(qreal nx, qreal ny, const QString &gesture, qr
         emit handDetectionChanged();
     }
 
+    // Map coordinates with margin zones
+    // Horizontal mapping: [HORIZONTAL_MARGIN, 1.0 - HORIZONTAL_MARGIN] -> [0.0, 1.0]
+    qreal mappedX = (nx - HORIZONTAL_MARGIN) / (1.0 - 2.0 * HORIZONTAL_MARGIN);
+    mappedX = qBound(0.0, mappedX, 1.0);
+
+    // Vertical mapping: [VERTICAL_MARGIN, 1.0 - VERTICAL_MARGIN] -> [0.0, 1.0]
+    qreal mappedY = (ny - VERTICAL_MARGIN) / (1.0 - 2.0 * VERTICAL_MARGIN);
+    mappedY = qBound(0.0, mappedY, 1.0);
+
     // Update cursor position with smoothing
-    qreal targetX = qBound(0.0, nx, 1.0);
-    qreal targetY = qBound(0.0, ny, 1.0);
+    qreal targetX = mappedX;
+    qreal targetY = mappedY;
 
     smoothCursor(targetX, targetY);
 
