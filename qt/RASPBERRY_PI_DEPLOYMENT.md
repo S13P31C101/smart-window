@@ -147,6 +147,8 @@ sudo apt install -y libqt6mqtt6 libqt6mqtt6-dev
 
 ### 3. 멀티미디어 코덱
 
+Qt Multimedia는 **GStreamer**를 백엔드로 사용하므로, 다양한 오디오/비디오 형식을 재생하기 위해 GStreamer 플러그인이 필요합니다.
+
 ```bash
 sudo apt install -y \
     libgstreamer1.0-dev \
@@ -156,7 +158,25 @@ sudo apt install -y \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-libav \
     gstreamer1.0-tools \
-    libpulse-dev
+    libpulse-dev \
+    gstreamer1.0-alsa \
+    gstreamer1.0-pulseaudio
+```
+
+**코덱 설명:**
+- `plugins-good`: MP3, AAC, WebM 등 일반적인 형식
+- `plugins-bad`: HLS, DASH 스트리밍 프로토콜
+- `plugins-ugly`: MPEG-2, H.264 (특허 문제로 분리)
+- `libav`: FFmpeg 기반 광범위한 코덱 (YouTube 음원 재생에 필수)
+- `alsa/pulseaudio`: 오디오 출력 백엔드
+
+**설치 확인:**
+```bash
+# GStreamer 버전 확인
+gst-launch-1.0 --version
+
+# 사용 가능한 플러그인 확인
+gst-inspect-1.0 | grep -E "libav|x264|aac"
 ```
 
 ---
@@ -174,13 +194,32 @@ source venv/bin/activate
 ### 2. Python 패키지 설치
 
 ```bash
-# requirements.txt 사용
+# requirements.txt 사용 (권장)
 pip install -r python/requirements.txt
 
 # 또는 개별 설치
 pip install opencv-python>=4.8.0
 pip install mediapipe>=0.10.0
 pip install numpy>=1.24.0
+pip install yt-dlp>=2023.10.13
+```
+
+**패키지 설명:**
+- `opencv-python`: 카메라 입력 및 이미지 처리 (MediaPipe 의존성)
+- `mediapipe`: 손 제스처 인식 AI 모델
+- `numpy`: 수치 연산 라이브러리 (MediaPipe 의존성)
+- `yt-dlp`: YouTube 음원 스트리밍 URL 추출 (음악 재생 필수)
+
+**설치 확인:**
+```bash
+# Python 패키지 확인
+pip list | grep -E "opencv|mediapipe|numpy|yt-dlp"
+
+# MediaPipe 동작 테스트
+python3 -c "import mediapipe; print('MediaPipe OK')"
+
+# yt-dlp 동작 테스트
+yt-dlp --version
 ```
 
 ### 3. 카메라 권한 설정
@@ -499,6 +538,58 @@ export QT_QPA_PLATFORM=eglfs
 # 또는 X11 사용 (데스크탑 환경)
 export QT_QPA_PLATFORM=xcb
 ./Lumiscape
+```
+
+### 6. YouTube 음원 재생 실패
+
+**증상:** YouTube 음악이 재생되지 않음, 무음, 또는 에러 메시지
+
+**원인 1: GStreamer 코덱 누락**
+```bash
+# 필수 GStreamer 플러그인 설치 확인
+dpkg -l | grep gstreamer1.0-libav
+
+# 없다면 설치
+sudo apt install -y gstreamer1.0-libav gstreamer1.0-plugins-ugly
+```
+
+**원인 2: yt-dlp 누락 또는 구버전**
+```bash
+# yt-dlp 버전 확인 (2023.10.13 이상 필요)
+yt-dlp --version
+
+# 업데이트
+pip install --upgrade yt-dlp
+```
+
+**원인 3: YouTube URL 형식 문제**
+```bash
+# Python 서비스 직접 테스트
+cd python
+python3 youtube_audio_service.py
+
+# 입력 예시:
+{"youtubeUrl": "https://www.youtube.com/watch?v=VIDEO_ID"}
+# 성공하면 streamUrl이 반환됨
+```
+
+**원인 4: 오디오 출력 장치 문제**
+```bash
+# 오디오 장치 확인
+aplay -l
+
+# PulseAudio 재시작
+pulseaudio --kill
+pulseaudio --start
+
+# ALSA 볼륨 확인
+alsamixer
+```
+
+**디버깅 로그 확인:**
+```bash
+# QML에서 YouTube 관련 로그 확인
+QT_LOGGING_RULES="qt.multimedia*=true" ./Lumiscape 2>&1 | grep -i youtube
 ```
 
 ---
