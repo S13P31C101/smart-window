@@ -19,6 +19,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import { useFocusEffect } from '@react-navigation/native'; // useFocusEffect import
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 1. AsyncStorage import 추가
 import { useDeviceStore } from '@/stores/deviceStore'; // 스토어 import
 
 const SERVICE_UUID = '2b8d0001-6828-46af-98aa-557761b15400';
@@ -87,6 +88,7 @@ function OpenCloseScreen() {
     }, 10000);
   };
   
+  // --- 2. 연결 성공 시 ID 저장 로직 추가 ---
   const connectToDevice = async (device: Device) => {
     try {
       bleManager.stopDeviceScan();
@@ -94,13 +96,18 @@ function OpenCloseScreen() {
       const connected = await device.connect();
       setConnectedDevice(connected);
       await connected.discoverAllServicesAndCharacteristics();
+      
+      // *** 핵심 추가 부분 ***
+      await AsyncStorage.setItem('lastConnectedDeviceId', device.id);
+      console.log(`[Storage] Saved device ID: ${device.id}`);
+      
     } catch (e) {
       console.error('Connection failed', e);
     }
   };
 
-  const disconnectDevice = () => {
-    // --- 진행 중인 스캔을 먼저 멈춥니다. ---
+  // --- 3. 연결 해제 시 ID 삭제 로직 추가 ---
+  const disconnectDevice = async () => { // async로 변경
     bleManager.stopDeviceScan();
     setIsScanning(false);
 
@@ -110,6 +117,10 @@ function OpenCloseScreen() {
       setPercentage(0);
       lastPosition.current = 0;
       translateX.setValue(0);
+
+      // *** 핵심 추가 부분 ***
+      await AsyncStorage.removeItem('lastConnectedDeviceId');
+      console.log('[Storage] Cleared saved device ID.');
     }
   };
 
@@ -189,61 +200,70 @@ function OpenCloseScreen() {
     </TouchableOpacity>
   );
 
-  // --- 자동 연결 로직 (핵심) ---
+  // --- 4. 화면 진입 시 자동 재연결 로직으로 수정 ---
   useFocusEffect(
     useCallback(() => {
-      const targetDeviceName = 'CLWM-B07';
-      let isConnecting = false;
+      const autoConnectAndScan = async () => {
+        // 먼저 저장된 ID가 있는지 확인
+        const savedDeviceId = await AsyncStorage.getItem('lastConnectedDeviceId');
 
-      const scanAndConnect = async () => {
-        try {
-          // 1. 스캔 시작
-          setStatusMessage(`'${targetDeviceName}' 기기를 스캔 중...`);
-          bleManager.startDeviceScan(null, null, (error, device) => {
-            if (error) {
-              console.error('Scan error:', error);
-              setStatusMessage('스캔 중 오류 발생');
-              bleManager.stopDeviceScan();
-              return;
-            }
-
-            // 2. 기기 발견 시 이름 확인
-            if (device && device.name === targetDeviceName && !isConnecting) {
-              isConnecting = true;
-              bleManager.stopDeviceScan(); // 찾았으면 스캔 중지
-              // setStatusMessage(`'${targetDeviceName}'에 연결됨`);
-
-              // 3. 연결 시도
-              connectToDevice(device); // 기존에 있던 연결 함수 재사용
-            }
-          });
-          
-          // 10초 후에도 못 찾으면 스캔 중지
-          setTimeout(() => {
-            if (!isConnecting && !connectedDevice) {
-              bleManager.stopDeviceScan();
-              // setStatusMessage(`'${targetDeviceName}'을 찾을 수 없습니다.`);
-            }
-          }, 10000);
-
-        } catch (error) {
-          console.error('Auto-connect error:', error);
-          setStatusMessage('자동 연결 실패');
+        if (savedDeviceId) {
+          setStatusMessage('저장된 기기에 재연결 시도 중...');
+          try {
+            // 저장된 ID로 직접 연결 시도 (스캔 불필요)
+            const device = await bleManager.connectToDevice(savedDeviceId);
+            setConnectedDevice(device);
+            await device.discoverAllServicesAndCharacteristics();
+            setStatusMessage(`'${device.name || '알 수 없는 기기'}'에 연결됨`);
+            return; // 연결 성공 시 여기서 종료
+          } catch (error) {
+            console.error(`Failed to reconnect to ${savedDeviceId}`, error);
+            // 실패 시 저장된 ID가 유효하지 않으므로 삭제
+            await AsyncStorage.removeItem('lastConnectedDeviceId');
+          }
         }
+        
+        // 저장된 ID가 없거나 재연결에 실패하면, 스캔 시작
+        scanForTargetDevice();
       };
 
-      if (!connectedDevice) { // 이미 연결된 기기가 없을 때만 실행
-        scanAndConnect();
+      const scanForTargetDevice = () => {
+        const targetDeviceName = 'CLWM-B07'; // 'minibig' 또는 실제 기기 이름으로 변경해야 할 수 있습니다.
+        let isConnecting = false;
+        
+        setStatusMessage(`'${targetDeviceName}' 기기를 스캔 중...`);
+        bleManager.startDeviceScan(null, null, (error, device) => {
+          if (error) {
+            console.error('Scan error:', error);
+            setStatusMessage('스캔 중 오류 발생');
+            bleManager.stopDeviceScan();
+            return;
+          }
+          if (device && device.name === targetDeviceName && !isConnecting) {
+            isConnecting = true;
+            bleManager.stopDeviceScan();
+            connectToDevice(device);
+          }
+        });
+
+        setTimeout(() => {
+          if (!isConnecting && !connectedDevice) {
+            bleManager.stopDeviceScan();
+            setStatusMessage(`'${targetDeviceName}'을 찾을 수 없습니다. 수동으로 검색해주세요.`);
+          }
+        }, 10000);
+      };
+
+      if (!connectedDevice) {
+        autoConnectAndScan();
       }
 
-      // 화면을 벗어날 때 정리(cleanup) 함수
       return () => {
         bleManager.stopDeviceScan();
-        console.log('[BLE] Leaving screen, scan stopped.');
       };
-    }, [connectedDevice]) // connectedDevice가 바뀔 때마다 이 효과를 재평가
+    }, [connectedDevice])
   );
-  // ---------------------------------
+  // --------------------------------------------------
 
   return (
     <LinearGradient colors={['#1A2F4D', '#2D5580']} style={styles.container}>
