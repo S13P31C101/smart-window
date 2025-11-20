@@ -186,13 +186,13 @@ Item {
         if (folderName === "uyuni" && currentTimeOfDay === "daytime") {
             return true
         }
-        if (folderName === "maple" && currentTimeOfDay === "morning") {
+        if (folderName === "mapleworld" && currentTimeOfDay === "morning") {
             return true
         }
-        if (folderName === "maple" && currentTimeOfDay === "daytime") {
+        if (folderName === "mapleworld" && currentTimeOfDay === "daytime") {
             return true
         }
-        
+
         // 예시: 다른 비디오를 추가하려면 아래와 같이 추가
         // if (folderName === "mapleworld" && currentTimeOfDay === "morning") return true
         // if (folderName === "paris" && currentTimeOfDay === "night") return true

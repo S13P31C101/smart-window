@@ -71,6 +71,11 @@
         <file>../assets/images/scenes/island/night_island.png</file>
         
         <!-- Scene Videos -->
+        
+        <file>../assets/videos/scenes/mapleworld/morning_maple.mp4</file>
+        <file>../assets/videos/scenes/mapleworld/daytime_maple.mp4</file>
+        
+        <file>../assets/videos/scenes/uyuni/morning_uyuni.mp4</file>
         <file>../assets/videos/scenes/uyuni/daytime_uyuni.mp4</file>
     </qresource>
 </RCC>
