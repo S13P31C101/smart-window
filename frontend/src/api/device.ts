@@ -375,42 +375,18 @@ const updateDeviceOpacity = async ({
   return response.data.data;
 };
 
-export const useUpdateDeviceOpacity = () => {
+export const useUpdateDeviceOpacity = (onSuccessCallback?: () => void) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateDeviceOpacity,
-
-    // 1. 낙관적 업데이트 시작
-    onMutate: async ({ deviceId, status }) => {
-      // 진행 중인 deviceDetail 쿼리를 취소 (덮어쓰기 방지)
-      await queryClient.cancelQueries({ queryKey: ['deviceDetail', deviceId] });
-
-      // 이전 상태를 저장 (롤백 대비)
-      const previousDeviceDetail = queryClient.getQueryData(['deviceDetail', deviceId]);
-
-      // UI 즉시 업데이트
-      queryClient.setQueryData(['deviceDetail', deviceId], (oldData: any) => ({
-        ...oldData,
-        opacityStatus: status,
-      }));
-
-      // 이전 상태를 context에 저장
-      return { previousDeviceDetail };
-    },
-
-    // 2. 에러 발생 시 롤백
-    onError: (err, variables, context) => {
-      console.error('❌ 디바이스 투명도 상태 업데이트 실패:', err);
-      // 저장해 둔 이전 상태로 UI를 되돌림
-      if (context?.previousDeviceDetail) {
-        queryClient.setQueryData(['deviceDetail', variables.deviceId], context.previousDeviceDetail);
-      }
-    },
-
-    // 3. 성공/실패와 관계없이 항상 서버 데이터와 동기화
-    onSettled: (data, error, variables) => {
+    onSuccess: (data, variables) => {
+      console.log('✅ 투명도 상태 업데이트 성공:', data);
       queryClient.invalidateQueries({ queryKey: ['deviceDetail', variables.deviceId] });
-      queryClient.invalidateQueries({ queryKey: ['devices'] }); // 목록도 갱신
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      onSuccessCallback?.(); // HomeScreen에서 전달받은 콜백 함수를 실행
+    },
+    onError: err => {
+      console.error('❌ 디바이스 투명도 상태 업데이트 실패:', err);
     },
   });
 };

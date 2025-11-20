@@ -4,6 +4,9 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+
+        <!-- 이 줄을 추가하여 런처 스크린 배경색을 지정합니다 -->
+        <item name="android:windowBackground">@color/splash_background</item> 
     </style>
 
 </resources>
