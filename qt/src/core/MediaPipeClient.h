@@ -25,10 +25,12 @@ public:
      * @brief Start the MediaPipe gesture recognition service
      * @param pythonPath Path to Python executable (default: "python3")
      * @param scriptPath Path to MediaPipe script
+     * @param cameraId Camera device ID (default: 0)
      * @return true if started successfully
      */
     Q_INVOKABLE bool start(const QString &pythonPath = "python3",
-                           const QString &scriptPath = "python/mediapipe_gesture_service.py");
+                           const QString &scriptPath = "python/mediapipe_gesture_service.py",
+                           int cameraId = 0);
 
     /**
      * @brief Stop the MediaPipe service
@@ -82,5 +84,6 @@ private:
     QString m_status{"Not started"};
     QString m_pythonPath;
     QString m_scriptPath;
+    int m_cameraId{0};
     bool m_autoRestart{true};
 };

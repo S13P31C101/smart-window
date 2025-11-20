@@ -244,6 +244,14 @@ void AppConfig::parseJson(const QJsonObject &json)
         }
     }
 
+    // MediaPipe settings
+    if (json.contains("mediapipe")) {
+        QJsonObject mediapipe = json["mediapipe"].toObject();
+        if (mediapipe.contains("cameraId")) {
+            m_mediaPipeCameraId = mediapipe["cameraId"].toInt();
+        }
+    }
+
     // Background Music settings
     if (json.contains("backgroundMusic")) {
         QJsonObject bgMusic = json["backgroundMusic"].toObject();

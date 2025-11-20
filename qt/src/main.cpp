@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
 
                     // Re-enable auto-restart and resume gesture recognition
                     mediaPipeClient.setAutoRestart(true);
-                    mediaPipeClient.start();
+                    mediaPipeClient.start("python3", "python/mediapipe_gesture_service.py", config.mediaPipeCameraId());
                     qInfo() << "  ✓ Gesture recognition: STARTED (auto-restart enabled)";
 
                     // Navigate to menu (or could restore previous mode)
@@ -571,7 +571,7 @@ int main(int argc, char *argv[])
     // ========================================================================
 
     // Start MediaPipe gesture recognition
-    mediaPipeClient.start();
+    mediaPipeClient.start("python3", "python/mediapipe_gesture_service.py", config.mediaPipeCameraId());
 
     // Subscribe to backend command topics
     // Topic pattern: /devices/{deviceUniqueId}/command/#

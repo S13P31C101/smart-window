@@ -25,7 +25,7 @@ MediaPipeClient::~MediaPipeClient()
     stop();
 }
 
-bool MediaPipeClient::start(const QString &pythonPath, const QString &scriptPath)
+bool MediaPipeClient::start(const QString &pythonPath, const QString &scriptPath, int cameraId)
 {
     if (isRunning()) {
         qWarning() << "MediaPipe client is already running";
@@ -34,11 +34,12 @@ bool MediaPipeClient::start(const QString &pythonPath, const QString &scriptPath
 
     m_pythonPath = pythonPath;
     m_scriptPath = scriptPath;
+    m_cameraId = cameraId;
 
-    qInfo() << "Starting MediaPipe service:" << pythonPath << scriptPath;
+    qInfo() << "Starting MediaPipe service:" << pythonPath << scriptPath << "with camera ID:" << cameraId;
     setStatus("Starting...");
 
-    m_process->start(pythonPath, QStringList() << scriptPath);
+    m_process->start(pythonPath, QStringList() << scriptPath << QString::number(cameraId));
 
     if (!m_process->waitForStarted(5000)) {
         QString error = QString("Failed to start MediaPipe service: %1").arg(m_process->errorString());
@@ -80,7 +81,7 @@ void MediaPipeClient::restart()
     qInfo() << "Restarting MediaPipe service";
     stop();
     QThread::msleep(500);  // Brief delay before restart
-    start(m_pythonPath, m_scriptPath);
+    start(m_pythonPath, m_scriptPath, m_cameraId);
 }
 
 void MediaPipeClient::setAutoRestart(bool enable)

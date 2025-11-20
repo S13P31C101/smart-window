@@ -81,6 +81,8 @@ public:
     QString spotifyClientSecret() const { return m_spotifyClientSecret; }
     QString spotifyRedirectUri() const { return m_spotifyRedirectUri; }
 
+    int mediaPipeCameraId() const { return m_mediaPipeCameraId; }
+
     QString applicationDirPath() const;
 
     QString currentMediaUrl() const { return m_currentMediaUrl; }
@@ -146,6 +148,9 @@ private:
     QString m_spotifyClientId;
     QString m_spotifyClientSecret;
     QString m_spotifyRedirectUri{"http://localhost:8888/callback"};
+
+    // MediaPipe settings
+    int m_mediaPipeCameraId{0};
 
     // System paths
     QString m_assetsPath{"assets"};

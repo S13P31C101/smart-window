@@ -25,7 +25,7 @@ from typing import Dict, Optional, Tuple
 class GestureRecognitionService:
     """MediaPipe-based gesture recognition service"""
 
-    def __init__(self, camera_id: int = 1):
+    def __init__(self, camera_id: int = 2):
         """
         Initialize gesture recognition service
 
